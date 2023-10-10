@@ -20,11 +20,11 @@ Maneja el almacenamiento y la recuperación de bloques en la blockchain. Esto pe
 ### 5. Transacción (`transaction.go`)
 Define cómo se crean y se manejan las transacciones en la blockchain.
 
+## Usuarios
+Para ingresar más usuarios se debe añadir nombres a la cadena de la linea 30 del archivo main.go, todas las contraseñas se establecen como "asd"
+
 ## Cómo empezar
 
 1. Clona el repositorio.
 2. Asegúrate de tener Go instalado en tu máquina.
 3. Ejecuta `go run .` para iniciar la blockchain.
-
-## Usuarios
-Para ingresar más usuarios se debe añadir nombres a la cadena de la linea 30 del archivo main.go, todas las contraseñas se establecen como "asd"
