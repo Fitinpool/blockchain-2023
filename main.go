@@ -30,6 +30,12 @@ func main() {
 	// Crear usuario
 	privKey, _ := GeneraLlavesPrivadas()
 
+	fmt.Println(privKey.PublicKey.X)
+	fmt.Println(privKey.PublicKey.Y)
+
+	address := PublicKeyToAddress(privKey)
+	fmt.Println("Direccion:", address)
+
 	data := &PrivateKeyData{
 		PrivateKey: PrivateKeyToBytes(privKey),
 		Password:   "asd",
@@ -52,7 +58,7 @@ func main() {
 	}
 	fmt.Println("Datos guardados con éxito.")
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(3600 * time.Second)
 	ClearScreen()
 
 	go menu(userdb, blockdb)

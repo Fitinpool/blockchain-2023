@@ -44,32 +44,3 @@ func CalculateHash(b Block) string {
 
 	return hex.EncodeToString(hash.Sum(nil))
 }
-
-// func SaveBlock(db *leveldb.DB, block *Block) error {
-// 	blockData, err := json.Marshal(block)
-// 	if err != nil {
-// 		return errors.Wrap(err, "storage: SaveBlock json.Marshal error")
-// 	}
-
-// 	err = db.Put([]byte(fmt.Sprintf("block-%d", block.Index)), blockData, nil)
-// 	if err != nil {
-// 		return errors.Wrap(err, "storage: SaveBlock db.Put error")
-// 	}
-
-// 	return nil
-// }
-
-// func LoadBlock(db *leveldb.DB, index int) (*Block, error) {
-// 	blockData, err := db.Get([]byte(fmt.Sprintf("block-%d", index)), nil)
-
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "storage: LoadBlock db.Get error")
-// 	}
-
-// 	var block Block
-// 	err = json.Unmarshal(blockData, &block)
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "storage: LoadBlock json.Unmarshal error")
-// 	}
-// 	return &block, nil
-// }
