@@ -27,39 +27,26 @@ func main() {
 	}
 	defer blockdb.Close()
 
-	privKey, publicKey, address := GeneraLlavesYAddress()
+	cadenaDeUser := []string{"Julio", "Vania", "Profesor"}
 
-	data := &User{
-		PrivateKey:    privKey,
-		PublicKey:     publicKey,
-		Nombre:        "Julio",
-		Password:      "asd",
-		Nonce:         0,
-		AccuntBalence: 1000,
+	for _, user := range cadenaDeUser {
+		privKey, publicKey, address := GeneraLlavesYAddress()
+
+		data := &User{
+			PrivateKey:    privKey,
+			PublicKey:     publicKey,
+			Nombre:        user,
+			Password:      "asd",
+			Nonce:         0,
+			AccuntBalence: 1000,
+		}
+
+		err = userdb.Put(address, data)
+		if err != nil {
+			errors.Wrap(err, "userdb.Put error")
+		}
+		fmt.Println("Datos guardados de " + user + ", Address: " + address)
 	}
-
-	err = userdb.Put(address, data)
-	if err != nil {
-		errors.Wrap(err, "userdb.Put error")
-	}
-	fmt.Println("Datos guardados de Julio, Address: " + address)
-
-	privKey, publicKey, address = GeneraLlavesYAddress()
-
-	data = &User{
-		PrivateKey:    privKey,
-		PublicKey:     publicKey,
-		Nombre:        "Vania",
-		Password:      "asd",
-		Nonce:         0,
-		AccuntBalence: 1000,
-	}
-
-	err = userdb.Put(address, data)
-	if err != nil {
-		errors.Wrap(err, "userdb.Put error")
-	}
-	fmt.Println("Datos guardados de Vania, Address: " + address)
 
 	fmt.Print("Presiona enter para continuar...")
 	fmt.Scanln()
