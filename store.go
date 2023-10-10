@@ -108,6 +108,37 @@ func (st *Store) GetAllBlocks() ([]Block, error) {
 	return blocks, nil
 }
 
+func (st *Store) GetAllUser() ([]struct {
+	Key  string
+	Data User
+}, error) {
+	iter := st.db.NewIterator(nil, nil)
+	var results []struct {
+		Key  string
+		Data User
+	}
+	for iter.Next() {
+		var user User
+		err := json.Unmarshal(iter.Value(), &user)
+		if err != nil {
+			return nil, errors.Wrap(err, "Store.GetAllUser json.Unmarshal error")
+		}
+		results = append(results, struct {
+			Key  string
+			Data User
+		}{
+			Key:  string(iter.Key()),
+			Data: user,
+		})
+	}
+	iter.Release()
+	err := iter.Error()
+	if err != nil {
+		return nil, errors.Wrap(err, "Store.GetAllUser iterator.Error error")
+	}
+	return results, nil
+}
+
 type DataStore interface {
 	Put(key, value []byte, wo *opt.WriteOptions) error
 	Get(key []byte, ro *opt.ReadOptions) ([]byte, error)

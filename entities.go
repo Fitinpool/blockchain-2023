@@ -17,9 +17,10 @@ type Block struct {
 }
 
 type User struct {
-	PrivateKey  []byte
-	PublicKey   []byte
-	Address     string
-	Password    string
-	Transaccion []string
+	PrivateKey    []byte
+	PublicKey     []byte
+	Nombre        string
+	Password      string
+	Nonce         int
+	AccuntBalence float64
 }

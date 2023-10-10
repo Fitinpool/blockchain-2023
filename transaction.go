@@ -3,10 +3,8 @@ package main
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"log"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -25,17 +23,20 @@ func GeneraLlavesYAddress() ([]byte, []byte, string) {
 	}
 
 	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
-	fmt.Println("Public Key:", hexutil.Encode(publicKeyBytes))
 
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
-	fmt.Println("Address:", address)
 
 	return privateKeyBytes, publicKeyBytes, address
 }
 
-func FirmaTransaccion(tx *Transaction, privateKey *ecdsa.PrivateKey) error {
+func FirmaTransaccion(tx *Transaction, privateKeyBytes []byte) error {
 	txCopy := *tx
 	txCopy.Signature = nil
+
+	privateKey, err := crypto.ToECDSA(privateKeyBytes)
+	if err != nil {
+		log.Fatalf("Error convirtiendo los bytes a clave privada: %v", err)
+	}
 
 	data, err := json.Marshal(txCopy)
 	if err != nil {
