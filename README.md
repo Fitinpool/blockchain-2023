@@ -35,4 +35,4 @@ Cada bloque en la blockchain se genera cada 1 minuto para modo de ver su uso de 
 
 Cada que ejecuta el `go run .` se creara otros usuario con distinta Address, por lo que al momento de hacer transacciones se vera distinto si ya habián datos guardados previamente, lo que quiere decir que si al ejecutar el programa 3 veces, habran 3 Julio con distinta Address.
 
-Todo el código está probado en linux y IOS.
+Todo el código está probado en Linux y MacOS.
