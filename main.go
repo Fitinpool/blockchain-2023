@@ -62,7 +62,7 @@ func main() {
 		if isEmpty {
 			currentBlock = CreateMainBlock()
 
-			key := fmt.Sprintf("%d", currentBlock.Index)
+			key := fmt.Sprintf("%05d", currentBlock.Index)
 			time.Sleep(10 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -83,7 +83,7 @@ func main() {
 			}
 
 			currentBlock = GenerateBlock(result.Index+1, result.Hash)
-			key := fmt.Sprintf("%d", currentBlock.Index)
+			key := fmt.Sprintf("%05d", currentBlock.Index)
 			time.Sleep(10 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -117,15 +117,16 @@ func menu(userdb *Store, blockdb *Store) {
 				errors.Wrap(err, "user json.Unmarshal error")
 			}
 
-			if resultUser.Password != inputPass {
-				fmt.Println("Address o contraseña incorrectos.")
-				time.Sleep(2 * time.Second)
-				ClearScreen()
-			} else {
+			if resultUser.Password == inputPass {
 				fmt.Println("Credenciales Correctas.")
 				time.Sleep(2 * time.Second)
 				ClearScreen()
 				break
+
+			} else {
+				fmt.Println("Usuario o contraseña incorrectos.")
+				time.Sleep(2 * time.Second)
+				ClearScreen()
 			}
 		}
 
