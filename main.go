@@ -326,6 +326,42 @@ func menu(userdb *Store, blockdb *Store) {
 					ClearScreen()
 				}
 			//fmt.Println("5. Buscar un bloque")
+			case 5:
+
+				var index int
+				fmt.Print("Introduce el numero del bloque: ")
+				fmt.Scanln(&index)
+
+				key := fmt.Sprintf("%d", index)
+
+				if index > currentBlock.Index {
+					fmt.Println("El bloque no existe")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+				}
+
+				retrievedData, err := blockdb.Get(key)
+				if err != nil {
+					errors.Wrap(err, "case 4 blockdb.Get error")
+				}
+
+				var resultBlock Block
+				err = json.Unmarshal(retrievedData, &resultBlock)
+				if err != nil {
+					errors.Wrap(err, "case 4 json.Unmarshal error")
+				}
+
+				fmt.Println("------------------------------------------------------------------")
+				fmt.Println("Index: " + fmt.Sprint(resultBlock.Index))
+				fmt.Println("Timestamp: " + fmt.Sprint(resultBlock.Timestamp))
+				fmt.Println("PreviousHash: " + fmt.Sprint(resultBlock.PreviousHash))
+				fmt.Println("Hash: " + fmt.Sprint(resultBlock.Hash))
+				fmt.Println("Transactions: ")
+				fmt.Println("------------------------------------------------------------------")
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
+				ClearScreen()
+
 			case 6:
 				blocks, err := blockdb.GetAllBlocks()
 				if len(blocks) == 0 {
