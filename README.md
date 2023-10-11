@@ -21,10 +21,16 @@ Maneja el almacenamiento y la recuperación de bloques en la blockchain. Esto pe
 Define cómo se crean y se manejan las transacciones en la blockchain.
 
 ## Usuarios
-Para ingresar más usuarios se debe añadir nombres a la cadena de la linea 30 del archivo main.go, todas las contraseñas se establecen como "asd"
+Para ingresar más usuarios se debe añadir nombres a la cadena de la linea 30 del archivo (`main.go`), todas las contraseñas se establecen como "asd".
 
 ## Cómo empezar
 
 1. Clona el repositorio.
 2. Asegúrate de tener Go instalado en tu máquina.
 3. Ejecuta `go run .` para iniciar la blockchain.
+
+## Consideraciones
+
+Cada bloque en la blockchain se genera cada 1 minuto para modo de ver su uso de manera más rapida, este valor es modificable en la linea 66 y 88 del archivo (`main.go`), si no hay transacciones dentro de ese tiempo la blockchain intruducira el bloque vacio.
+
+Cada que ejecuta el `go run .` se creara otros usuario con distinta Address, por lo que al momento de hacer transacciones se vera distinto si ya habián datos guardados previamente, lo que quiere decir que si al ejecutar el programa 3 veces, habran 3 Julio con distinta Address.
