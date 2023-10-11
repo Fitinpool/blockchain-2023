@@ -63,7 +63,7 @@ func main() {
 			currentBlock = CreateMainBlock()
 
 			key := fmt.Sprintf("%d", currentBlock.Index)
-			time.Sleep(10 * time.Second)
+			time.Sleep(60 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
 			if err != nil {
@@ -84,7 +84,7 @@ func main() {
 
 			currentBlock = GenerateBlock(result.Index+1, result.Hash)
 			key := fmt.Sprintf("%d", currentBlock.Index)
-			time.Sleep(10 * time.Second)
+			time.Sleep(60 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
 			if err != nil {
@@ -337,7 +337,7 @@ func menu(userdb *Store, blockdb *Store) {
 
 				key := fmt.Sprintf("%d", index)
 
-				if index > currentBlock.Index {
+				if index > currentBlock.Index || index < 0 {
 					fmt.Println("El bloque no existe")
 					time.Sleep(2 * time.Second)
 					ClearScreen()
