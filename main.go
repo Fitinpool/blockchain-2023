@@ -143,7 +143,7 @@ func menu(userdb *Store, blockdb *Store) {
 			fmt.Println("4. Buscar transacción específica")
 			fmt.Println("5. Buscar un bloque")
 			fmt.Println("6. Mostrar todos los bloques")
-			fmt.Println("7. Cerar Sesión")
+			fmt.Println("7. Cerrar Sesión")
 			fmt.Println("8. Salir")
 			fmt.Print("Elige una opción: ")
 			fmt.Scan(&option)
