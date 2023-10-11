@@ -34,3 +34,5 @@ Para ingresar más usuarios se debe añadir nombres a la cadena de la linea 30 d
 Cada bloque en la blockchain se genera cada 1 minuto para modo de ver su uso de manera más rapida, este valor es modificable en la linea 66 y 88 del archivo (`main.go`), si no hay transacciones dentro de ese tiempo la blockchain intruducira el bloque vacio.
 
 Cada que ejecuta el `go run .` se creara otros usuario con distinta Address, por lo que al momento de hacer transacciones se vera distinto si ya habián datos guardados previamente, lo que quiere decir que si al ejecutar el programa 3 veces, habran 3 Julio con distinta Address.
+
+Todo el código está probado en linux y IOS.
