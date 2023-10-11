@@ -79,7 +79,6 @@ func (st *Store) GetLastKey() []byte {
 	iter := st.db.NewIterator(nil, nil)
 	var lastValue []byte
 	for iter.Next() {
-		fmt.Println(string(iter.Key()))
 		lastValue = iter.Value()
 	}
 	iter.Release()
