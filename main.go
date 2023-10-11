@@ -325,7 +325,42 @@ func menu(userdb *Store, blockdb *Store) {
 					fmt.Scanln()
 					ClearScreen()
 				}
+			//fmt.Println("5. Buscar un bloque")
+			case 6:
+				blocks, err := blockdb.GetAllBlocks()
+				if len(blocks) == 0 {
+					fmt.Println("No hay Bloques")
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+					break
+				}
+				if err != nil {
+					errors.Wrap(err, "case 6 blockdb.GetAllBlocks error")
+				}
+				fmt.Println("------------------------------------------------------------------")
+				for _, block := range blocks {
+					fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+					fmt.Println("Index: " + fmt.Sprint(block.Index))
+					fmt.Println("Timestamp: " + fmt.Sprint(block.Timestamp))
+					fmt.Println("PreviousHash: " + fmt.Sprint(block.PreviousHash))
+					fmt.Println("Hash: " + fmt.Sprint(block.Hash))
+					fmt.Println("Transactions: ")
+					for _, tx := range block.Transactions {
+						if tx.Sender == inputUser || tx.Recipient == inputUser {
+							fmt.Println("----------------")
+							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+							fmt.Println("----------------")
+						}
+					}
+					fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+				}
 
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
+				ClearScreen()
 			case 7:
 				fmt.Println("Cerrar Sesión...")
 				time.Sleep(2 * time.Second)
