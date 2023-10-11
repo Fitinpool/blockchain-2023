@@ -62,7 +62,7 @@ func main() {
 		if isEmpty {
 			currentBlock = CreateMainBlock()
 
-			key := fmt.Sprintf("%05d", currentBlock.Index)
+			key := fmt.Sprintf("%d", currentBlock.Index)
 			time.Sleep(10 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -83,7 +83,7 @@ func main() {
 			}
 
 			currentBlock = GenerateBlock(result.Index+1, result.Hash)
-			key := fmt.Sprintf("%05d", currentBlock.Index)
+			key := fmt.Sprintf("%d", currentBlock.Index)
 			time.Sleep(10 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -117,11 +117,13 @@ func menu(userdb *Store, blockdb *Store) {
 				errors.Wrap(err, "user json.Unmarshal error")
 			}
 
-			if resultUser.Password == inputPass {
-				fmt.Println("Credenciales Correctas.")
-				time.Sleep(2 * time.Second)
-				ClearScreen()
-				break
+			if resultUser.Password != "" {
+				if resultUser.Password == inputPass {
+					fmt.Println("Credenciales Correctas.")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+					break
+				}
 
 			} else {
 				fmt.Println("Usuario o contraseña incorrectos.")
@@ -343,13 +345,13 @@ func menu(userdb *Store, blockdb *Store) {
 
 				retrievedData, err := blockdb.Get(key)
 				if err != nil {
-					errors.Wrap(err, "case 4 blockdb.Get error")
+					errors.Wrap(err, "case 5 blockdb.Get error")
 				}
 
 				var resultBlock Block
 				err = json.Unmarshal(retrievedData, &resultBlock)
 				if err != nil {
-					errors.Wrap(err, "case 4 json.Unmarshal error")
+					errors.Wrap(err, "case 5 json.Unmarshal error")
 				}
 
 				fmt.Println("------------------------------------------------------------------")
@@ -373,7 +375,7 @@ func menu(userdb *Store, blockdb *Store) {
 					break
 				}
 				if err != nil {
-					errors.Wrap(err, "case 6 blockdb.GetAllBlocks error")
+					errors.Wrap(err, "case 5 blockdb.GetAllBlocks error")
 				}
 				fmt.Println("------------------------------------------------------------------")
 				for _, block := range blocks {
