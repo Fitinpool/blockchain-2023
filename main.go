@@ -62,7 +62,7 @@ func main() {
 		if isEmpty {
 			currentBlock = CreateMainBlock()
 
-			key := fmt.Sprintf("%d", currentBlock.Index)
+			key := fmt.Sprintf("%05d", currentBlock.Index)
 			time.Sleep(60 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -83,7 +83,7 @@ func main() {
 			}
 
 			currentBlock = GenerateBlock(result.Index+1, result.Hash)
-			key := fmt.Sprintf("%d", currentBlock.Index)
+			key := fmt.Sprintf("%05d", currentBlock.Index)
 			time.Sleep(60 * time.Second)
 
 			err = blockdb.Put(key, currentBlock)
@@ -198,6 +198,7 @@ func menu(userdb *Store, blockdb *Store) {
 				currentBlock.Transactions = append(currentBlock.Transactions, *tx)
 
 				fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+				fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
 
 				resultUser.Nonce = resultUser.Nonce + 1
 				resultUser.AccuntBalence = resultUser.AccuntBalence - amount
@@ -257,6 +258,8 @@ func menu(userdb *Store, blockdb *Store) {
 							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
 							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
 							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+							fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+							fmt.Println("Bloque:" + fmt.Sprint(block.Index))
 						}
 					}
 				}
@@ -271,7 +274,7 @@ func menu(userdb *Store, blockdb *Store) {
 				fmt.Print("Introduce el nonce de la transaccion: ")
 				fmt.Scanln(&nonce)
 
-				key := fmt.Sprintf("%d", index)
+				key := fmt.Sprintf("%05d", index)
 				nonceString := fmt.Sprintf("%d", nonce)
 
 				if index > currentBlock.Index {
@@ -335,7 +338,7 @@ func menu(userdb *Store, blockdb *Store) {
 				fmt.Print("Introduce el numero del bloque: ")
 				fmt.Scanln(&index)
 
-				key := fmt.Sprintf("%d", index)
+				key := fmt.Sprintf("%05d", index)
 
 				if index > currentBlock.Index || index < 0 {
 					fmt.Println("El bloque no existe")
