@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 
+	e "blockchain/entities"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -29,7 +31,7 @@ func GeneraLlavesYAddress() ([]byte, []byte, string) {
 	return privateKeyBytes, publicKeyBytes, address
 }
 
-func FirmaTransaccion(tx *Transaction, privateKeyBytes []byte) error {
+func FirmaTransaccion(tx *e.Transaction, privateKeyBytes []byte) error {
 	txCopy := *tx
 	txCopy.Signature = nil
 

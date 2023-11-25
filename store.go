@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	e "blockchain/entities"
+
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -89,11 +91,11 @@ func (st *Store) GetLastKey() []byte {
 	return lastValue
 }
 
-func (st *Store) GetAllBlocks() ([]Block, error) {
+func (st *Store) GetAllBlocks() ([]e.Block, error) {
 	iter := st.db.NewIterator(nil, nil)
-	var blocks []Block
+	var blocks []e.Block
 	for iter.Next() {
-		var block Block
+		var block e.Block
 		err := json.Unmarshal(iter.Value(), &block)
 		if err != nil {
 			return nil, errors.Wrap(err, "Store.GetAllBlocks json.Unmarshal error")
@@ -110,22 +112,22 @@ func (st *Store) GetAllBlocks() ([]Block, error) {
 
 func (st *Store) GetAllUser() ([]struct {
 	Key  string
-	Data User
+	Data e.User
 }, error) {
 	iter := st.db.NewIterator(nil, nil)
 	var results []struct {
 		Key  string
-		Data User
+		Data e.User
 	}
 	for iter.Next() {
-		var user User
+		var user e.User
 		err := json.Unmarshal(iter.Value(), &user)
 		if err != nil {
 			return nil, errors.Wrap(err, "Store.GetAllUser json.Unmarshal error")
 		}
 		results = append(results, struct {
 			Key  string
-			Data User
+			Data e.User
 		}{
 			Key:  string(iter.Key()),
 			Data: user,
