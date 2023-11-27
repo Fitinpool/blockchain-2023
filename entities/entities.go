@@ -19,10 +19,10 @@ type Block struct {
 type User struct {
 	PrivateKey    []byte
 	PublicKey     []byte
+	Nombre        string
 	Password      string
 	Nonce         int
 	AccuntBalence float64
-	Address       string
 }
 
 type Ledger struct {

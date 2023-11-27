@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	e "blockchain/entities"
@@ -22,7 +21,6 @@ func main() {
 
 	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
 	port := flag.String("port", "4000", "Port to enable network connection")
-	peerAddresses := flag.String("peer", "", "Comma separated list of peers to connect with")
 	flag.Parse()
 
 	node, err := p2p.NewNode(&p2p.NodeConfig{
@@ -36,38 +34,45 @@ func main() {
 
 	blockdb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
 	if err != nil {
-		errors.Wrap(err, "main: NewStore error blockchain")
+		errors.Wrap(err, "main: NewStore error")
 	}
 
+	defer blockdb.Close()
+
+	node.MdnsService.Start()
 	node.Start()
 
+	// node.ConnectWithPeers(*peerAddresses)
+
 	// generar datos para la transaccion
-	privKey, publicKey, address := GeneraLlavesYAddress()
+	// privKey, publicKey, address := GeneraLlavesYAddress()
 
-	data := &e.User{
-		PrivateKey:    privKey,
-		PublicKey:     publicKey,
-		Address:       address,
-		AccuntBalence: 1000,
-		Nonce:         0,
-	}
+	// data := &e.User{
+	// 	PrivateKey:    privKey,
+	// 	PublicKey:     publicKey,
+	// 	Address:       address,
+	// 	AccuntBalence: 1000,
+	// 	Nonce:         0,
+	// }
 
-	userdb, err := NewStore("userdb")
-	if err != nil {
-		errors.Wrap(err, "main: NewStore error userdb")
-	}
+	// userdb, err := NewStore("userdb")
+	// if err != nil {
+	// 	errors.Wrap(err, "main: NewStore error userdb")
+	// }
 
-	userdb.Put(node.NetworkHost.ID().String(), data)
-	defer userdb.Close()
+	// userdb.Put(node.NetworkHost.ID().String(), data)
+	// defer userdb.Close()
 
-	err = blockdb.Put(address, data)
-	if err != nil {
-		errors.Wrap(err, "main: blockdb.Put error")
-	}
+	// err = blockdb.Put(address, data)
+	// if err != nil {
+	// 	errors.Wrap(err, "main: blockdb.Put error")
+	// }
 
-	if *peerAddresses != "" {
-		node.ConnectWithPeers(strings.Split(*peerAddresses, ","))
-	}
+	// peerAddresses := node.MdnsService.PeerChan()
+
+	// if *peerAddresses != "" {
+	// 	node.ConnectWithPeers(strings.Split(*peerAddresses, ","))
+	// }
 
 	// libp2p.Option( libp2p.Identity(privKey))
 
@@ -192,7 +197,6 @@ func menu(blockdb *Store) {
 			var option int
 			var bandera bool = false
 			fmt.Println("\n---------- Menú ----------")
-			fmt.Println("Bienvenid@")
 			fmt.Println("1. Ver Contactos")
 			fmt.Println("2. Realizar transacción")
 			fmt.Println("3. Mostrar transacciones")

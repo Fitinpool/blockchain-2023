@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -24,6 +25,7 @@ type Node struct {
 	MdnsService    mdns.Service
 	ConnectedPeers map[string]*peer.AddrInfo
 	Port           string
+	mu             sync.Mutex
 }
 
 type NodeConfig struct {
@@ -36,7 +38,7 @@ func NewNode(config *NodeConfig) (*Node, error) {
 	address := libp2p.ListenAddrStrings(listenAddress)
 	host, err := libp2p.New(address)
 	if err != nil {
-		return nil, errors.Wrap(err, "network: NewNode libp2p.New error")
+		return nil, errors.Wrap(err, "p2p: NewNode libp2p.New error")
 	}
 
 	peerInfo := peer.AddrInfo{
@@ -46,61 +48,66 @@ func NewNode(config *NodeConfig) (*Node, error) {
 
 	addrs, err := peer.AddrInfoToP2pAddrs(&peerInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "network: NewNode peer.AddrInfoToP2pAddrs error")
+		return nil, errors.Wrap(err, "p2p: NewNode peer.AddrInfoToP2pAddrs error")
 	}
 
 	fmt.Printf("Node address: %s\n", addrs[0])
 
+	notifee := &discoveryveryNotifee{}
+
 	mdnsService := mdns.NewMdnsService(
 		host,
 		namespace,
-		&discoveryveryNotifee{},
+		notifee,
 	)
 
-	mdnsService.Start()
-
-	return &Node{
+	notifee.node = &Node{
 		NetworkHost:    host,
 		MdnsService:    mdnsService,
 		ConnectedPeers: make(map[string]*peer.AddrInfo),
 		Port:           config.Port,
-	}, nil
+	}
+
+	return notifee.node, nil
 }
 
-func (n *Node) ConnectWithPeers(peersAddresses []string) error {
+func (n *Node) ConnectWithPeers(peerAddress string) error {
 
-	for _, peerAddr := range peersAddresses {
-		peerMultiAddr, err := multiaddr.NewMultiaddr(peerAddr)
-		if err != nil {
-			err = errors.Wrap(err, "network: Node.ConnectWithPeers multiaddr.NewMultiaddr error")
-			fmt.Printf("%s with peer %s", err.Error(), peerAddr)
-			return err
-		}
-
-		peerAddrInfo, err := peer.AddrInfoFromP2pAddr(peerMultiAddr)
-		if err != nil {
-			err = errors.Wrap(err, "network: Node.ConnectWithPeers peer.AddrInfoFromP2pAddr error")
-			fmt.Printf("%s with peer %s", err.Error(), peerAddr)
-			return err
-		}
-
-		err = n.NetworkHost.Connect(context.Background(), *peerAddrInfo)
-		if err != nil {
-			err = errors.Wrap(err, "network: Node.ConnectWithPeers n.NetworkHost.Connect error")
-			fmt.Printf("%s with peer %s", err.Error(), peerAddr)
-			return err
-		}
-		fmt.Printf("Connected to peer %s\n", peerAddrInfo.String())
-
-		n.ConnectedPeers[peerAddrInfo.String()] = peerAddrInfo
+	peerMultiAddr, err := multiaddr.NewMultiaddr(peerAddress)
+	if err != nil {
+		err = errors.Wrap(err, "p2p: Node.ConnectWithPeers multiaddr.NewMultiaddr error")
+		fmt.Printf("%s with peer %s", err.Error(), peerAddress)
+		return err
 	}
+
+	peerAddrInfo, err := peer.AddrInfoFromP2pAddr(peerMultiAddr)
+	if err != nil {
+		err = errors.Wrap(err, "p2p: Node.ConnectWithPeers peer.AddrInfoFromP2pAddr error")
+		fmt.Printf("%s with peer %s", err.Error(), peerAddress)
+		return err
+	}
+
+	n.mu.Lock()
+	err = n.NetworkHost.Connect(context.Background(), *peerAddrInfo)
+	if err != nil {
+		err = errors.Wrap(err, "p2p: Node.ConnectWithPeers n.NetworkHost.Connect error")
+		fmt.Printf("%s with peer %s", err.Error(), peerAddress)
+		return err
+	}
+	fmt.Printf("Conectado con %s\n", peerAddrInfo.ID)
+	n.mu.Unlock()
+
+	n.ConnectedPeers[peerAddrInfo.String()] = peerAddrInfo
 
 	return nil
 }
 
 type discoveryveryNotifee struct {
+	node *Node
 }
 
 func (n *discoveryveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
-	fmt.Printf("Found peer: %s\n", pi.ID)
+	peerAddress := fmt.Sprintf("%s/p2p/%s", pi.Addrs[0].String(), pi.ID.String())
+	fmt.Printf("Peer encontrado: %s\n", peerAddress)
+	n.node.ConnectWithPeers(peerAddress)
 }
