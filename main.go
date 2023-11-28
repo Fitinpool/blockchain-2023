@@ -167,6 +167,11 @@ func menu(blockdb *Store, userdb *Store) {
 						fmt.Println("Credenciales Correctas.")
 						time.Sleep(2 * time.Second)
 						ClearScreen()
+						bandera = true
+					} else {
+						fmt.Println("Usuario o contraseña incorrectos.")
+						time.Sleep(2 * time.Second)
+						ClearScreen()
 					}
 
 				} else {
@@ -202,10 +207,14 @@ func menu(blockdb *Store, userdb *Store) {
 				fmt.Print("Presiona enter para continuar...")
 				fmt.Scanln()
 				ClearScreen()
-				break
+				bandera = true
 
 			default:
 				fmt.Println("Opcion no valida")
+			}
+
+			if bandera {
+				break
 			}
 		}
 
