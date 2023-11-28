@@ -85,7 +85,12 @@ func main() {
 		errors.Wrap(err, "NewStore error blockchain")
 	}
 
-	go menu(blockdb, userdb)
+	blockNodedb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
+	if err != nil {
+		errors.Wrap(err, "NewStore error blockchain")
+	}
+
+	go menu(blockNodedb, blockdb, userdb)
 
 	for {
 		isEmpty, err := blockdb.IsEmpty()
@@ -128,7 +133,7 @@ func main() {
 	}
 }
 
-func menu(blockdb *Store, userdb *Store) {
+func menu(blockNodedb *Store, blockdb *Store, userdb *Store) {
 	var inputUser, inputPass string
 	var resultUser e.User
 

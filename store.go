@@ -28,6 +28,38 @@ func NewStore(dbName string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
+func CopyStore(newDbName string) (*Store, error) {
+	oldPathToDB := fmt.Sprintf("data/%s", "blockchain")
+	oldDb, err := leveldb.OpenFile(oldPathToDB, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer oldDb.Close()
+
+	newPathToDB := fmt.Sprintf("data/%s", newDbName)
+	newDb, err := leveldb.OpenFile(newPathToDB, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	iter := oldDb.NewIterator(nil, nil)
+	for iter.Next() {
+		key := iter.Key()
+		value := iter.Value()
+		err = newDb.Put(key, value, nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "CopyStore newDb.Put error")
+		}
+	}
+	iter.Release()
+	err = iter.Error()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Store{db: newDb}, nil
+}
+
 func (st *Store) Put(key string, value interface{}) error {
 	inputKey := []byte(key)
 	inputData, err := json.Marshal(value)
