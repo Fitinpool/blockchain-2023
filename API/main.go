@@ -1,110 +1,161 @@
 package main
 
-// var currentBlock e.Block
+import (
+	"blockchain/p2p"
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"net/http"
 
-// func getBlock(c *gin.Context) {
-// 	//hacer case 5 aqui
-// 	index := c.Param("ID")
+	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
+)
 
-// 	key := fmt.Sprintf("%05d", index)
+func api() {
+	//copy paste del main
 
-// 	retrievedData, err := blockdb.Get(key)
+	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
+	port := flag.String("port", "4000", "Port to enable network connection")
+	protocol := flag.String("protocol", "/xulo/1.0.0", "Protocol to enable network connection")
+	flag.Parse()
 
-// 	if err != nil {
-// 		return
-// 	}
+	node, err := p2p.NewNode(&p2p.NodeConfig{
+		IP:   *hostIP,
+		Port: *port,
+	})
 
-// 	var resultBlock e.Block
-// 	err = json.Unmarshal(retrievedData, &resultBlock)
+	if err != nil {
+		errors.Wrap(err, "main: p2p.NewNode error")
+	}
 
-// 	//se envia estado y resultado
-// 	c.IndentedJSON(http.StatusOK, resultBlock)
-// }
+	node.MdnsService.Start()
 
-// func getLastTransaction(c *gin.Context) {
-// 	//hacer last
+	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
+	if err != nil {
+		errors.Wrap(err, "NewStore error blockchain")
+	}
+	defer blockNodedb.Close()
 
-// 	//se envia estado
-// 	c.IndentedJSON(http.StatusOK, lastTransaction)
-// }
+	userNodedb, err := NewStore(fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+	if err != nil {
+		errors.Wrap(err, "NewStore error blockchain")
+	}
+	defer userNodedb.Close()
 
-// func newTransaction(c *gin.Context) {
+	node.SetupStreamHandler(context.Background(), node.HandleStream)
+	node.Start()
 
-// 	var recipient string
-// 	var amount float64
+	if *protocol == p2p.Protocol {
 
-// 	//hay que ver que pedir
+		CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
+		CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
 
-// 	tx := &e.Transaction{
-// 		Sender:    inputUser,
-// 		Recipient: recipient,
-// 		Amount:    amount,
-// 		Nonce:     resultUser.Nonce + 1,
-// 	}
+		for _, peer := range node.ConnectedPeers {
+			stream, error := node.NetworkHost.NewStream(context.Background(), peer.ID, p2p.ProtocolDataSharing)
+			if error != nil {
+				errors.Wrap(error, "main: node.NetworkHost.NewStream error")
+			}
+			node.HandleStream(stream)
+		}
+	}
 
-// 	FirmaTransaccion(tx, resultUser.PrivateKey)
+	//rutas
 
-// 	currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+	router := gin.Default()
+	router.GET("/block/:ID", getBlock(blockNodedb))
+	//router.POST("/transaction", newTransaction)
 
-// 	fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-// 	fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+	router.Run("localhost:3000")
+}
 
-// 	resultUser.Nonce = resultUser.Nonce + 1
-// 	resultUser.AccuntBalence = resultUser.AccuntBalence - amount
+func getBlock(blockdb *Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		//hacer case 5 aqui
+		index := c.Param("ID")
 
-// 	err := userdb.Put(inputUser, resultUser)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "error put"})
-// 	}
+		key := fmt.Sprintf("%05d", index)
 
-// 	recipientPut, err := userdb.Get(recipient)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no existe o error"})
-// 	}
+		retrievedData, err := blockdb.Get(key)
 
-// 	var recipientResult e.User
-// 	err = json.Unmarshal(recipientPut, &recipientResult)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-// 	}
+		if err != nil {
+			return
+		}
 
-// 	recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
+		var resultBlock e.Block
+		err = json.Unmarshal(retrievedData, &resultBlock)
 
-// 	err = userdb.Put(recipient, recipientResult)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "juserdb.Put error"})
-// 	}
+		//se envia estado y resultado
+		c.IndentedJSON(http.StatusOK, resultBlock)
+	}
+}
 
-// 	newResult, err := userdb.Get(inputUser)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "userdb.Get error"})
-// 	}
+/*
+func getLastTransaction(c *gin.Context) {
+	//hacer last
 
-// 	err = json.Unmarshal(newResult, &resultUser)
-// 	if err != nil {
-// 		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-// 	}
+	//se envia estado
+	c.IndentedJSON(http.StatusOK, lastTransaction)
+}
 
-// 	//se envia estado ok
-// 	c.IndentedJSON(http.StatusCreated, tx)
-// }
+func newTransaction(c *gin.Context) {
 
-// func main() {
+	var recipient string
+	var amount float64
 
-// 	blockdb, err := NewStore("blockchain")
-// 	if err != nil {
-// 		errors.Wrap(err, "NewStore error blockchain")
-// 	}
+	//hay que ver que pedir
 
-// 	userdb, err := NewStore("userdb")
-// 	if err != nil {
-// 		errors.Wrap(err, "main: NewStore error userdb")
-// 	}
-// 	//rutas
+	tx := &e.Transaction{
+		Sender:    inputUser,
+		Recipient: recipient,
+		Amount:    amount,
+		Nonce:     resultUser.Nonce + 1,
+	}
 
-// 	router := gin.Default()
-// 	router.GET("/block/:ID", getBlock)
-// 	router.POST("/transaction", getBlock)
+	FirmaTransaccion(tx, resultUser.PrivateKey)
 
-// 	router.Run("localhost:3000")
-// }
+	currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+
+	fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+	fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+
+	resultUser.Nonce = resultUser.Nonce + 1
+	resultUser.AccuntBalence = resultUser.AccuntBalence - amount
+
+	err := userdb.Put(inputUser, resultUser)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "error put"})
+	}
+
+	recipientPut, err := userdb.Get(recipient)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no existe o error"})
+	}
+
+	var recipientResult e.User
+	err = json.Unmarshal(recipientPut, &recipientResult)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
+	}
+
+	recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
+
+	err = userdb.Put(recipient, recipientResult)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "juserdb.Put error"})
+	}
+
+	newResult, err := userdb.Get(inputUser)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "userdb.Get error"})
+	}
+
+	err = json.Unmarshal(newResult, &resultUser)
+	if err != nil {
+		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
+	}
+
+	//se envia estado ok
+	c.IndentedJSON(http.StatusCreated, tx)
+}
+*/
