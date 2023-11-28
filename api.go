@@ -29,7 +29,7 @@ func api() {
 
 	router := gin.Default()
 	router.GET("/block/:ID", getBlock(blockdb))
-	//router.POST("/transaction", newTransaction)
+	router.POST("/transaction", newTransaction(blockdb, userdb))
 
 	router.Run("localhost:3000")
 }
@@ -63,64 +63,68 @@ func getLastTransaction(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, lastTransaction)
 }
 
-func newTransaction(c *gin.Context) {
-
-	var recipient string
-	var amount float64
-
-	//hay que ver que pedir
-
-	tx := &e.Transaction{
-		Sender:    inputUser,
-		Recipient: recipient,
-		Amount:    amount,
-		Nonce:     resultUser.Nonce + 1,
-	}
-
-	FirmaTransaccion(tx, resultUser.PrivateKey)
-
-	currentBlock.Transactions = append(currentBlock.Transactions, *tx)
-
-	fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-	fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-
-	resultUser.Nonce = resultUser.Nonce + 1
-	resultUser.AccuntBalence = resultUser.AccuntBalence - amount
-
-	err := userdb.Put(inputUser, resultUser)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "error put"})
-	}
-
-	recipientPut, err := userdb.Get(recipient)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no existe o error"})
-	}
-
-	var recipientResult e.User
-	err = json.Unmarshal(recipientPut, &recipientResult)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-	}
-
-	recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
-
-	err = userdb.Put(recipient, recipientResult)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "juserdb.Put error"})
-	}
-
-	newResult, err := userdb.Get(inputUser)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "userdb.Get error"})
-	}
-
-	err = json.Unmarshal(newResult, &resultUser)
-	if err != nil {
-		c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-	}
-
-	//se envia estado ok
-	c.IndentedJSON(http.StatusCreated, tx)
-}
 */
+
+func newTransaction(blockdb *Store, userdb *Store) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var inputUser string
+		var recipient string
+		var amount float64
+		var resultUser User
+
+		//hay que ver que pedir
+
+		tx := &e.Transaction{
+			Sender:    inputUser,
+			Recipient: recipient,
+			Amount:    amount,
+			Nonce:     resultUser.Nonce + 1,
+		}
+
+		FirmaTransaccion(tx, resultUser.PrivateKey)
+
+		currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+
+		fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+		fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+
+		resultUser.Nonce = resultUser.Nonce + 1
+		resultUser.AccuntBalence = resultUser.AccuntBalence - amount
+
+		err := userdb.Put(inputUser, resultUser)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "error put"})
+		}
+
+		recipientPut, err := userdb.Get(recipient)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no existe o error"})
+		}
+
+		var recipientResult e.User
+		err = json.Unmarshal(recipientPut, &recipientResult)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
+		}
+
+		recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
+
+		err = userdb.Put(recipient, recipientResult)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "juserdb.Put error"})
+		}
+
+		newResult, err := userdb.Get(inputUser)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "userdb.Get error"})
+		}
+
+		err = json.Unmarshal(newResult, &resultUser)
+		if err != nil {
+			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
+		}
+
+		//se envia estado ok
+		c.IndentedJSON(http.StatusCreated, tx)
+	}
+}
