@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ func main() {
 
 	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
 	port := flag.String("port", "4000", "Port to enable network connection")
+	protocol := flag.String("protocol", "/xulo/1.0.0", "Protocol to enable network connection")
 	flag.Parse()
 
 	node, err := p2p.NewNode(&p2p.NodeConfig{
@@ -34,19 +36,6 @@ func main() {
 	}
 
 	node.MdnsService.Start()
-	node.Start()
-
-	userdb, err := NewStore("userdb")
-	if err != nil {
-		errors.Wrap(err, "main: NewStore error userdb")
-	}
-	defer userdb.Close()
-
-	blockdb, err := NewStore("blockchain")
-	if err != nil {
-		errors.Wrap(err, "NewStore error blockchain")
-	}
-	defer blockdb.Close()
 
 	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
 	if err != nil {
@@ -60,53 +49,70 @@ func main() {
 	}
 	defer userNodedb.Close()
 
-	CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
-	CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+	node.SetupStreamHandler(context.Background(), node.HandleStream)
+	node.Start()
 
-	go menu(blockNodedb, userNodedb)
+	if *protocol == p2p.Protocol {
 
-	for {
-		isEmpty, err := blockNodedb.IsEmpty()
-		if err != nil {
-			errors.Wrap(err, "blockdb.IsEmpty error")
+		CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
+		CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+
+		for _, peer := range node.ConnectedPeers {
+			stream, error := node.NetworkHost.NewStream(context.Background(), peer.ID, p2p.ProtocolDataSharing)
+			if error != nil {
+				errors.Wrap(error, "main: node.NetworkHost.NewStream error")
+			}
+			node.HandleStream(stream)
 		}
-		if isEmpty {
-			currentBlock = CreateMainBlock()
 
-			key := fmt.Sprintf("%05d", currentBlock.Index)
-			time.Sleep(60 * time.Second)
+		go menu(blockNodedb, userNodedb, node)
 
-			err = blockdb.Put(key, currentBlock)
+		for {
+			isEmpty, err := blockNodedb.IsEmpty()
 			if err != nil {
-				errors.Wrap(err, "blockdb.Put error")
+				errors.Wrap(err, "blockdb.IsEmpty error")
 			}
-		} else {
+			if isEmpty {
+				currentBlock = CreateMainBlock()
 
-			lastValues := blockdb.GetLastKey()
-			if err != nil {
-				errors.Wrap(err, "blockdb.GetLastKey error")
+				key := fmt.Sprintf("%05d", currentBlock.Index)
+				time.Sleep(60 * time.Second)
+
+				err = blockNodedb.Put(key, currentBlock)
+				if err != nil {
+					errors.Wrap(err, "blockNodedb.Put error")
+				}
+			} else {
+
+				lastValues := blockNodedb.GetLastKey()
+				if err != nil {
+					errors.Wrap(err, "blockNodedb.GetLastKey error")
+				}
+
+				var result e.Block
+				err = json.Unmarshal(lastValues, &result)
+				if err != nil {
+					errors.Wrap(err, "json.unmarshal error")
+				}
+
+				currentBlock = GenerateBlock(result.Index+1, result.Hash)
+				key := fmt.Sprintf("%05d", currentBlock.Index)
+				time.Sleep(60 * time.Second)
+
+				err = blockNodedb.Put(key, currentBlock)
+				if err != nil {
+					errors.Wrap(err, "blockdb.Put error")
+				}
+
 			}
-
-			var result e.Block
-			err = json.Unmarshal(lastValues, &result)
-			if err != nil {
-				errors.Wrap(err, "json.unmarshal error")
-			}
-
-			currentBlock = GenerateBlock(result.Index+1, result.Hash)
-			key := fmt.Sprintf("%05d", currentBlock.Index)
-			time.Sleep(60 * time.Second)
-
-			err = blockdb.Put(key, currentBlock)
-			if err != nil {
-				errors.Wrap(err, "blockdb.Put error")
-			}
-
 		}
+	} else {
+		fmt.Println("Protocolo no valido")
 	}
+
 }
 
-func menu(blockdb *Store, userdb *Store) {
+func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 	var inputUser, inputPass string
 	var resultUser e.User
 
@@ -396,7 +402,7 @@ func menu(blockdb *Store, userdb *Store) {
 					fmt.Scanln()
 					ClearScreen()
 				}
-			//fmt.Println("5. Buscar un bloque")
+
 			case 5:
 
 				var index int

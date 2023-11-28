@@ -51,7 +51,9 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		return nil, errors.Wrap(err, "p2p: NewNode peer.AddrInfoToP2pAddrs error")
 	}
 
+	fmt.Println("--------------------------------------------------")
 	fmt.Printf("Node address: %s\n", addrs[0])
+	fmt.Println("--------------------------------------------------")
 
 	notifee := &discoveryveryNotifee{}
 
@@ -95,6 +97,7 @@ func (n *Node) ConnectWithPeers(peerAddress string) error {
 		return err
 	}
 	fmt.Printf("Conectado con %s\n", peerAddrInfo.ID)
+	fmt.Println("--------------------------------------------------")
 	n.mu.Unlock()
 
 	n.ConnectedPeers[peerAddrInfo.String()] = peerAddrInfo
@@ -108,6 +111,7 @@ type discoveryveryNotifee struct {
 
 func (n *discoveryveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	peerAddress := fmt.Sprintf("%s/p2p/%s", pi.Addrs[0].String(), pi.ID.String())
+	fmt.Println("--------------------------------------------------")
 	fmt.Printf("Peer encontrado: %s\n", peerAddress)
 	n.node.ConnectWithPeers(peerAddress)
 }
