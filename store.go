@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	e "blockchain/entities"
 
@@ -16,6 +17,7 @@ import (
 type Store struct {
 	// db *leveldb.DB
 	db DataStore
+	mu sync.RWMutex
 }
 
 func NewStore(dbName string) (*Store, error) {
@@ -61,6 +63,7 @@ func CopyStore(oldDbName string, newDbName string) (*Store, error) {
 }
 
 func (st *Store) Put(key string, value interface{}) error {
+	st.mu.Lock()
 	inputKey := []byte(key)
 	inputData, err := json.Marshal(value)
 	if err != nil {
@@ -72,16 +75,19 @@ func (st *Store) Put(key string, value interface{}) error {
 		return errors.Wrap(err, "Store.Put st.db.Put error")
 	}
 
+	defer st.mu.Unlock()
 	return nil
 }
 
 func (st *Store) Get(key string) ([]byte, error) {
+	st.mu.Lock()
 	inputKey := []byte(key)
 	data, err := st.db.Get(inputKey, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "Store.Get st.db.Get error")
 	}
 
+	defer st.mu.Unlock()
 	return data, nil
 }
 
@@ -95,6 +101,7 @@ func (st *Store) Close() error {
 }
 
 func (st *Store) IsEmpty() (bool, error) {
+	st.mu.Lock()
 	iterator := st.db.NewIterator(nil, nil)
 	defer iterator.Release()
 
@@ -106,10 +113,12 @@ func (st *Store) IsEmpty() (bool, error) {
 		return false, errors.Wrap(err, "Store.IsEmpty iterator.Error error")
 	}
 
+	defer st.mu.Unlock()
 	return true, nil
 }
 
 func (st *Store) GetLastKey() []byte {
+	st.mu.Lock()
 	iter := st.db.NewIterator(nil, nil)
 	var lastValue []byte
 	for iter.Next() {
@@ -120,10 +129,13 @@ func (st *Store) GetLastKey() []byte {
 	if err != nil {
 		errors.Wrap(err, "Store.GetLastKey iterator.Error error")
 	}
+
+	defer st.mu.Unlock()
 	return lastValue
 }
 
 func (st *Store) GetAllBlocks() ([]e.Block, error) {
+	st.mu.Lock()
 	iter := st.db.NewIterator(nil, nil)
 	var blocks []e.Block
 	for iter.Next() {
@@ -139,6 +151,8 @@ func (st *Store) GetAllBlocks() ([]e.Block, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Store.GetAllBlocks iterator.Error error")
 	}
+
+	defer st.mu.Unlock()
 	return blocks, nil
 }
 
@@ -146,6 +160,7 @@ func (st *Store) GetAllUser() ([]struct {
 	Key  string
 	Data e.User
 }, error) {
+	st.mu.Lock()
 	iter := st.db.NewIterator(nil, nil)
 	var results []struct {
 		Key  string
@@ -170,6 +185,8 @@ func (st *Store) GetAllUser() ([]struct {
 	if err != nil {
 		return nil, errors.Wrap(err, "Store.GetAllUser iterator.Error error")
 	}
+
+	defer st.mu.Unlock()
 	return results, nil
 }
 
