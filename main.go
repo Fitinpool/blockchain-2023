@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,8 @@ import (
 
 	e "blockchain/entities"
 
+	"blockchain/p2p"
+
 	"github.com/pkg/errors"
 )
 
@@ -17,83 +20,50 @@ var currentBlock e.Block
 
 func main() {
 
-	// hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
-	// port := flag.String("port", "4000", "Port to enable network connection")
-	// flag.Parse()
+	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
+	port := flag.String("port", "4000", "Port to enable network connection")
+	flag.Parse()
 
-	// node, err := p2p.NewNode(&p2p.NodeConfig{
-	// 	IP:   *hostIP,
-	// 	Port: *port,
-	// })
+	node, err := p2p.NewNode(&p2p.NodeConfig{
+		IP:   *hostIP,
+		Port: *port,
+	})
 
-	// if err != nil {
-	// 	errors.Wrap(err, "main: p2p.NewNode error")
-	// }
+	if err != nil {
+		errors.Wrap(err, "main: p2p.NewNode error")
+	}
 
-	// blockdb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
-	// if err != nil {
-	// 	errors.Wrap(err, "main: NewStore error")
-	// }
-
-	// defer blockdb.Close()
-
-	// node.MdnsService.Start()
-	// node.Start()
-
-	// node.ConnectWithPeers(*peerAddresses)
-
-	// generar datos para la transaccion
-	// privKey, publicKey, address := GeneraLlavesYAddress()
-
-	// data := &e.User{
-	// 	PrivateKey:    privKey,
-	// 	PublicKey:     publicKey,
-	// 	Address:       address,
-	// 	AccuntBalence: 1000,
-	// 	Nonce:         0,
-	// }
+	node.MdnsService.Start()
+	node.Start()
 
 	userdb, err := NewStore("userdb")
 	if err != nil {
 		errors.Wrap(err, "main: NewStore error userdb")
 	}
-
-	// userdb.Put(node.NetworkHost.ID().String(), data)
-	// defer userdb.Close()
-
-	// err = blockdb.Put(address, data)
-	// if err != nil {
-	// 	errors.Wrap(err, "main: blockdb.Put error")
-	// }
-
-	// peerAddresses := node.MdnsService.PeerChan()
-
-	// if *peerAddresses != "" {
-	// 	node.ConnectWithPeers(strings.Split(*peerAddresses, ","))
-	// }
-
-	// libp2p.Option( libp2p.Identity(privKey))
-
-	// userdb, err := NewStore("userdb")
-	// if err != nil {
-	// 	errors.Wrap(err, "NewStore error userdb")
-	// }
-	// defer userdb.Close()
+	defer userdb.Close()
 
 	blockdb, err := NewStore("blockchain")
 	if err != nil {
 		errors.Wrap(err, "NewStore error blockchain")
 	}
+	defer blockdb.Close()
 
-	blockNodedb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
+	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
 	if err != nil {
 		errors.Wrap(err, "NewStore error blockchain")
 	}
+	defer blockNodedb.Close()
 
-	go menu(blockNodedb, blockdb, userdb)
+	userNodedb, err := NewStore(fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+	if err != nil {
+		errors.Wrap(err, "NewStore error blockchain")
+	}
+	defer userNodedb.Close()
+
+	go menu(blockNodedb, userNodedb)
 
 	for {
-		isEmpty, err := blockdb.IsEmpty()
+		isEmpty, err := blockNodedb.IsEmpty()
 		if err != nil {
 			errors.Wrap(err, "blockdb.IsEmpty error")
 		}
@@ -133,7 +103,7 @@ func main() {
 	}
 }
 
-func menu(blockNodedb *Store, blockdb *Store, userdb *Store) {
+func menu(blockdb *Store, userdb *Store) {
 	var inputUser, inputPass string
 	var resultUser e.User
 
