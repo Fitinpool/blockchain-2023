@@ -28,8 +28,8 @@ func NewStore(dbName string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func CopyStore(newDbName string) (*Store, error) {
-	oldPathToDB := fmt.Sprintf("data/%s", "blockchain")
+func CopyStore(oldDbName string, newDbName string) (*Store, error) {
+	oldPathToDB := fmt.Sprintf("data/%s", oldDbName)
 	oldDb, err := leveldb.OpenFile(oldPathToDB, nil)
 	if err != nil {
 		return nil, err

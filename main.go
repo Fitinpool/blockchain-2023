@@ -60,6 +60,9 @@ func main() {
 	}
 	defer userNodedb.Close()
 
+	CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
+	CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+
 	go menu(blockNodedb, userNodedb)
 
 	for {
