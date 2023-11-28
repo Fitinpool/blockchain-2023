@@ -84,32 +84,6 @@ func main() {
 	if err != nil {
 		errors.Wrap(err, "NewStore error blockchain")
 	}
-	// defer blockdb.Close()
-
-	cadenaDeUser := []string{"Julio", "Vania", "Profesor"}
-
-	for _, user := range cadenaDeUser {
-		privKey, publicKey, address := GeneraLlavesYAddress()
-
-		data := &e.User{
-			PrivateKey:    privKey,
-			PublicKey:     publicKey,
-			Nombre:        user,
-			Password:      "asd",
-			Nonce:         0,
-			AccuntBalence: 1000,
-		}
-
-		err = userdb.Put(address, data)
-		if err != nil {
-			errors.Wrap(err, "userdb.Put error")
-		}
-		fmt.Println("Datos guardados de " + user + ", Address: " + address)
-	}
-
-	fmt.Print("Presiona enter para continuar...")
-	fmt.Scanln()
-	ClearScreen()
 
 	go menu(blockdb, userdb)
 
@@ -160,34 +134,78 @@ func menu(blockdb *Store, userdb *Store) {
 
 	for {
 		for {
-			fmt.Print("Introduce Address: ")
-			fmt.Scanln(&inputUser)
 
-			fmt.Print("Introduce la contraseña: ")
-			fmt.Scanln(&inputPass)
+			var option int
+			var bandera bool = false
+			var userRegister, passRegister string
+			fmt.Println("\n---------- Menú ----------")
+			fmt.Println("1. Ingresar")
+			fmt.Println("2. Registrar")
+			fmt.Print("Elige una opción: ")
+			fmt.Scan(&option)
 
-			retrievedData, err := userdb.Get(inputUser)
-			if err != nil {
-				errors.Wrap(err, "userdb.Get error")
-			}
+			switch option {
+			case 1:
+				fmt.Print("Introduce Address: ")
+				fmt.Scanln(&inputUser)
 
-			err = json.Unmarshal(retrievedData, &resultUser)
-			if err != nil {
-				errors.Wrap(err, "user json.Unmarshal error")
-			}
+				fmt.Print("Introduce la contraseña: ")
+				fmt.Scanln(&inputPass)
 
-			if resultUser.Password != "" {
-				if resultUser.Password == inputPass {
-					fmt.Println("Credenciales Correctas.")
-					time.Sleep(2 * time.Second)
-					ClearScreen()
-					break
+				retrievedData, err := userdb.Get(inputUser)
+				if err != nil {
+					errors.Wrap(err, "userdb.Get error")
 				}
 
-			} else {
-				fmt.Println("Usuario o contraseña incorrectos.")
-				time.Sleep(2 * time.Second)
+				err = json.Unmarshal(retrievedData, &resultUser)
+				if err != nil {
+					errors.Wrap(err, "user json.Unmarshal error")
+				}
+
+				if resultUser.Password != "" {
+					if resultUser.Password == inputPass {
+						fmt.Println("Credenciales Correctas.")
+						time.Sleep(2 * time.Second)
+						ClearScreen()
+					}
+
+				} else {
+					fmt.Println("Usuario o contraseña incorrectos.")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+				}
+			case 2:
+				fmt.Print("Introduce Usuario: ")
+				fmt.Scanln(&userRegister)
+
+				fmt.Print("Introduce la contraseña: ")
+				fmt.Scanln(&passRegister)
+
+				privKey, publicKey, address := GeneraLlavesYAddress()
+
+				data := &e.User{
+					PrivateKey:    privKey,
+					PublicKey:     publicKey,
+					Nombre:        userRegister,
+					Password:      passRegister,
+					Nonce:         0,
+					AccuntBalence: 1000,
+				}
+
+				err := userdb.Put(address, data)
+
+				if err != nil {
+					errors.Wrap(err, "userdb.Put error")
+				}
+
+				fmt.Println("Datos guardados de " + userRegister + ", Address: " + address)
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
 				ClearScreen()
+				break
+
+			default:
+				fmt.Println("Opcion no valida")
 			}
 		}
 
@@ -227,247 +245,247 @@ func menu(blockdb *Store, userdb *Store) {
 				fmt.Scanln()
 				ClearScreen()
 
-			// case 2:
-			// 	var recipient string
-			// 	var amount float64
+			case 2:
+				var recipient string
+				var amount float64
 
-			// 	fmt.Printf("Tienes un saldo de : %f", resultUser.AccuntBalence)
-			// 	fmt.Println("")
-			// 	fmt.Print("Introduce el destinatario: ")
-			// 	fmt.Scanln(&recipient)
+				fmt.Printf("Tienes un saldo de : %f", resultUser.AccuntBalence)
+				fmt.Println("")
+				fmt.Print("Introduce el destinatario: ")
+				fmt.Scanln(&recipient)
 
-			// 	fmt.Print("Introduce la cantidad: ")
-			// 	fmt.Scanln(&amount)
+				fmt.Print("Introduce la cantidad: ")
+				fmt.Scanln(&amount)
 
-			// 	if amount > resultUser.AccuntBalence {
-			// 		fmt.Println("No tienes saldo suficiente")
-			// 		time.Sleep(2 * time.Second)
-			// 		ClearScreen()
-			// 		break
-			// 	}
+				if amount > resultUser.AccuntBalence {
+					fmt.Println("No tienes saldo suficiente")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+					break
+				}
 
-			// 	tx := &e.Transaction{
-			// 		Sender:    inputUser,
-			// 		Recipient: recipient,
-			// 		Amount:    amount,
-			// 		Nonce:     resultUser.Nonce + 1,
-			// 	}
+				tx := &e.Transaction{
+					Sender:    inputUser,
+					Recipient: recipient,
+					Amount:    amount,
+					Nonce:     resultUser.Nonce + 1,
+				}
 
-			// 	FirmaTransaccion(tx, resultUser.PrivateKey)
+				FirmaTransaccion(tx, resultUser.PrivateKey)
 
-			// 	currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+				currentBlock.Transactions = append(currentBlock.Transactions, *tx)
 
-			// 	fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-			// 	fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+				fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+				fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
 
-			// 	resultUser.Nonce = resultUser.Nonce + 1
-			// 	resultUser.AccuntBalence = resultUser.AccuntBalence - amount
+				resultUser.Nonce = resultUser.Nonce + 1
+				resultUser.AccuntBalence = resultUser.AccuntBalence - amount
 
-			// 	err := userdb.Put(inputUser, resultUser)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 2 userdb.Put error")
-			// 	}
+				err := userdb.Put(inputUser, resultUser)
+				if err != nil {
+					errors.Wrap(err, "case 2 userdb.Put error")
+				}
 
-			// 	recipientPut, err := userdb.Get(recipient)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "No existe o Error")
-			// 	}
+				recipientPut, err := userdb.Get(recipient)
+				if err != nil {
+					errors.Wrap(err, "No existe o Error")
+				}
 
-			// 	var recipientResult e.User
-			// 	err = json.Unmarshal(recipientPut, &recipientResult)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 2 json.Unmarshal error")
-			// 	}
+				var recipientResult e.User
+				err = json.Unmarshal(recipientPut, &recipientResult)
+				if err != nil {
+					errors.Wrap(err, "case 2 json.Unmarshal error")
+				}
 
-			// 	recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
+				recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
 
-			// 	err = userdb.Put(recipient, recipientResult)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 2 userdb.Put error")
-			// 	}
+				err = userdb.Put(recipient, recipientResult)
+				if err != nil {
+					errors.Wrap(err, "case 2 userdb.Put error")
+				}
 
-			// 	newResult, err := userdb.Get(inputUser)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "userdb.Get error")
-			// 	}
+				newResult, err := userdb.Get(inputUser)
+				if err != nil {
+					errors.Wrap(err, "userdb.Get error")
+				}
 
-			// 	err = json.Unmarshal(newResult, &resultUser)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 2 json.Unmarshal error")
-			// 	}
+				err = json.Unmarshal(newResult, &resultUser)
+				if err != nil {
+					errors.Wrap(err, "case 2 json.Unmarshal error")
+				}
 
-			// 	time.Sleep(2 * time.Second)
-			// 	ClearScreen()
-			// case 3:
-			// 	blocks, err := blockdb.GetAllBlocks()
-			// 	if len(blocks) == 0 {
-			// 		fmt.Println("No hay transacciones")
-			// 		fmt.Print("Presiona enter para continuar...")
-			// 		fmt.Scanln()
-			// 		ClearScreen()
-			// 		break
-			// 	}
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 3 blockdb.GetAllBlocks error")
-			// 	}
-			// 	fmt.Println("------------------------------------------------------------------")
-			// 	for _, block := range blocks {
-			// 		for _, tx := range block.Transactions {
-			// 			if tx.Sender == inputUser || tx.Recipient == inputUser {
-			// 				fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
-			// 				fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
-			// 				fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
-			// 				fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
-			// 				fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-			// 				fmt.Println("Bloque:" + fmt.Sprint(block.Index))
-			// 			}
-			// 		}
-			// 	}
-			// 	fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
-			// 	fmt.Print("Presiona enter para continuar...")
-			// 	fmt.Scanln()
-			// 	ClearScreen()
-			// case 4:
-			// 	var index, nonce int
-			// 	fmt.Print("Introduce el numero del bloque: ")
-			// 	fmt.Scanln(&index)
-			// 	fmt.Print("Introduce el nonce de la transaccion: ")
-			// 	fmt.Scanln(&nonce)
+				time.Sleep(2 * time.Second)
+				ClearScreen()
+			case 3:
+				blocks, err := blockdb.GetAllBlocks()
+				if len(blocks) == 0 {
+					fmt.Println("No hay transacciones")
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+					break
+				}
+				if err != nil {
+					errors.Wrap(err, "case 3 blockdb.GetAllBlocks error")
+				}
+				fmt.Println("------------------------------------------------------------------")
+				for _, block := range blocks {
+					for _, tx := range block.Transactions {
+						if tx.Sender == inputUser || tx.Recipient == inputUser {
+							fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+							fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+							fmt.Println("Bloque:" + fmt.Sprint(block.Index))
+						}
+					}
+				}
+				fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
+				ClearScreen()
+			case 4:
+				var index, nonce int
+				fmt.Print("Introduce el numero del bloque: ")
+				fmt.Scanln(&index)
+				fmt.Print("Introduce el nonce de la transaccion: ")
+				fmt.Scanln(&nonce)
 
-			// 	key := fmt.Sprintf("%05d", index)
-			// 	nonceString := fmt.Sprintf("%d", nonce)
+				key := fmt.Sprintf("%05d", index)
+				nonceString := fmt.Sprintf("%d", nonce)
 
-			// 	if index > currentBlock.Index {
-			// 		fmt.Println("El bloque no existe")
-			// 		time.Sleep(2 * time.Second)
-			// 		ClearScreen()
-			// 	} else if index == currentBlock.Index {
-			// 		fmt.Println("------------------------------------------------------------------")
-			// 		bandera := false
-			// 		for _, tx := range currentBlock.Transactions {
-			// 			if fmt.Sprint(tx.Nonce) == nonceString {
-			// 				fmt.Println("    Sender: " + tx.Sender)
-			// 				fmt.Println("    Recipient: " + tx.Recipient)
-			// 				fmt.Println("    Amount: " + fmt.Sprintf("%f", tx.Amount))
-			// 				fmt.Println("    Nonce: " + fmt.Sprintf("%d", tx.Nonce))
-			// 				bandera = true
-			// 			}
-			// 		}
-			// 		if !bandera {
-			// 			fmt.Println("No se encontro la transaccion")
-			// 		}
-			// 		fmt.Println("------------------------------------------------------------------")
-			// 		fmt.Print("Presiona enter para continuar...")
-			// 		fmt.Scanln()
-			// 		ClearScreen()
-			// 	} else {
-			// 		retrievedData, err := blockdb.Get(key)
-			// 		if err != nil {
-			// 			errors.Wrap(err, "case 4 blockdb.Get error")
-			// 		}
+				if index > currentBlock.Index {
+					fmt.Println("El bloque no existe")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+				} else if index == currentBlock.Index {
+					fmt.Println("------------------------------------------------------------------")
+					bandera := false
+					for _, tx := range currentBlock.Transactions {
+						if fmt.Sprint(tx.Nonce) == nonceString {
+							fmt.Println("    Sender: " + tx.Sender)
+							fmt.Println("    Recipient: " + tx.Recipient)
+							fmt.Println("    Amount: " + fmt.Sprintf("%f", tx.Amount))
+							fmt.Println("    Nonce: " + fmt.Sprintf("%d", tx.Nonce))
+							bandera = true
+						}
+					}
+					if !bandera {
+						fmt.Println("No se encontro la transaccion")
+					}
+					fmt.Println("------------------------------------------------------------------")
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+				} else {
+					retrievedData, err := blockdb.Get(key)
+					if err != nil {
+						errors.Wrap(err, "case 4 blockdb.Get error")
+					}
 
-			// 		var resultBlock e.Block
-			// 		err = json.Unmarshal(retrievedData, &resultBlock)
-			// 		if err != nil {
-			// 			errors.Wrap(err, "case 4 json.Unmarshal error")
-			// 		}
+					var resultBlock e.Block
+					err = json.Unmarshal(retrievedData, &resultBlock)
+					if err != nil {
+						errors.Wrap(err, "case 4 json.Unmarshal error")
+					}
 
-			// 		fmt.Println("------------------------------------------------------------------")
-			// 		bandera := false
-			// 		for _, tx := range resultBlock.Transactions {
-			// 			if fmt.Sprint(tx.Nonce) == nonceString {
-			// 				fmt.Println("    Sender: " + tx.Sender)
-			// 				fmt.Println("    Recipient: " + tx.Recipient)
-			// 				fmt.Println("    Amount: " + fmt.Sprintf("%f", tx.Amount))
-			// 				fmt.Println("    Nonce: " + fmt.Sprintf("%d", tx.Nonce))
-			// 				bandera = true
-			// 			}
-			// 		}
-			// 		if !bandera {
-			// 			fmt.Println("No se encontro la transaccion")
-			// 		}
-			// 		fmt.Println("------------------------------------------------------------------")
-			// 		fmt.Print("Presiona enter para continuar...")
-			// 		fmt.Scanln()
-			// 		ClearScreen()
-			// 	}
-			// //fmt.Println("5. Buscar un bloque")
-			// case 5:
+					fmt.Println("------------------------------------------------------------------")
+					bandera := false
+					for _, tx := range resultBlock.Transactions {
+						if fmt.Sprint(tx.Nonce) == nonceString {
+							fmt.Println("    Sender: " + tx.Sender)
+							fmt.Println("    Recipient: " + tx.Recipient)
+							fmt.Println("    Amount: " + fmt.Sprintf("%f", tx.Amount))
+							fmt.Println("    Nonce: " + fmt.Sprintf("%d", tx.Nonce))
+							bandera = true
+						}
+					}
+					if !bandera {
+						fmt.Println("No se encontro la transaccion")
+					}
+					fmt.Println("------------------------------------------------------------------")
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+				}
+			//fmt.Println("5. Buscar un bloque")
+			case 5:
 
-			// 	var index int
-			// 	fmt.Print("Introduce el numero del bloque: ")
-			// 	fmt.Scanln(&index)
+				var index int
+				fmt.Print("Introduce el numero del bloque: ")
+				fmt.Scanln(&index)
 
-			// 	key := fmt.Sprintf("%05d", index)
+				key := fmt.Sprintf("%05d", index)
 
-			// 	if index > currentBlock.Index || index < 0 {
-			// 		fmt.Println("El bloque no existe")
-			// 		time.Sleep(2 * time.Second)
-			// 		ClearScreen()
-			// 	}
+				if index > currentBlock.Index || index < 0 {
+					fmt.Println("El bloque no existe")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+				}
 
-			// 	retrievedData, err := blockdb.Get(key)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 5 blockdb.Get error")
-			// 	}
+				retrievedData, err := blockdb.Get(key)
+				if err != nil {
+					errors.Wrap(err, "case 5 blockdb.Get error")
+				}
 
-			// 	var resultBlock e.Block
-			// 	err = json.Unmarshal(retrievedData, &resultBlock)
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 5 json.Unmarshal error")
-			// 	}
+				var resultBlock e.Block
+				err = json.Unmarshal(retrievedData, &resultBlock)
+				if err != nil {
+					errors.Wrap(err, "case 5 json.Unmarshal error")
+				}
 
-			// 	fmt.Println("------------------------------------------------------------------")
-			// 	fmt.Println("Index: " + fmt.Sprint(resultBlock.Index))
-			// 	fmt.Println("Timestamp: " + fmt.Sprint(resultBlock.Timestamp))
-			// 	fmt.Println("PreviousHash: " + fmt.Sprint(resultBlock.PreviousHash))
-			// 	fmt.Println("Hash: " + fmt.Sprint(resultBlock.Hash))
-			// 	fmt.Println("Transactions: ")
-			// 	fmt.Println("------------------------------------------------------------------")
-			// 	fmt.Print("Presiona enter para continuar...")
-			// 	fmt.Scanln()
-			// 	ClearScreen()
+				fmt.Println("------------------------------------------------------------------")
+				fmt.Println("Index: " + fmt.Sprint(resultBlock.Index))
+				fmt.Println("Timestamp: " + fmt.Sprint(resultBlock.Timestamp))
+				fmt.Println("PreviousHash: " + fmt.Sprint(resultBlock.PreviousHash))
+				fmt.Println("Hash: " + fmt.Sprint(resultBlock.Hash))
+				fmt.Println("Transactions: ")
+				fmt.Println("------------------------------------------------------------------")
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
+				ClearScreen()
 
-			// case 6:
-			// 	blocks, err := blockdb.GetAllBlocks()
-			// 	if len(blocks) == 0 {
-			// 		fmt.Println("No hay Bloques")
-			// 		fmt.Print("Presiona enter para continuar...")
-			// 		fmt.Scanln()
-			// 		ClearScreen()
-			// 		break
-			// 	}
-			// 	if err != nil {
-			// 		errors.Wrap(err, "case 5 blockdb.GetAllBlocks error")
-			// 	}
-			// 	fmt.Println("------------------------------------------------------------------")
-			// 	for _, block := range blocks {
-			// 		fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
-			// 		fmt.Println("Index: " + fmt.Sprint(block.Index))
-			// 		fmt.Println("Timestamp: " + fmt.Sprint(block.Timestamp))
-			// 		fmt.Println("PreviousHash: " + fmt.Sprint(block.PreviousHash))
-			// 		fmt.Println("Hash: " + fmt.Sprint(block.Hash))
-			// 		fmt.Println("Transactions: ")
-			// 		for _, tx := range block.Transactions {
-			// 			if tx.Sender == inputUser || tx.Recipient == inputUser {
-			// 				fmt.Println("----------------")
-			// 				fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
-			// 				fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
-			// 				fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
-			// 				fmt.Println("----------------")
-			// 			}
-			// 		}
-			// 		fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
-			// 	}
+			case 6:
+				blocks, err := blockdb.GetAllBlocks()
+				if len(blocks) == 0 {
+					fmt.Println("No hay Bloques")
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+					break
+				}
+				if err != nil {
+					errors.Wrap(err, "case 5 blockdb.GetAllBlocks error")
+				}
+				fmt.Println("------------------------------------------------------------------")
+				for _, block := range blocks {
+					fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+					fmt.Println("Index: " + fmt.Sprint(block.Index))
+					fmt.Println("Timestamp: " + fmt.Sprint(block.Timestamp))
+					fmt.Println("PreviousHash: " + fmt.Sprint(block.PreviousHash))
+					fmt.Println("Hash: " + fmt.Sprint(block.Hash))
+					fmt.Println("Transactions: ")
+					for _, tx := range block.Transactions {
+						if tx.Sender == inputUser || tx.Recipient == inputUser {
+							fmt.Println("----------------")
+							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+							fmt.Println("----------------")
+						}
+					}
+					fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+				}
 
-			// 	fmt.Print("Presiona enter para continuar...")
-			// 	fmt.Scanln()
-			// 	ClearScreen()
-			// case 7:
-			// 	fmt.Println("Cerrar Sesión...")
-			// 	time.Sleep(2 * time.Second)
-			// 	ClearScreen()
-			// 	bandera = true
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
+				ClearScreen()
+			case 7:
+				fmt.Println("Cerrar Sesión...")
+				time.Sleep(2 * time.Second)
+				ClearScreen()
+				bandera = true
 			case 8:
 				fmt.Println("Saliendo...")
 				os.Exit(0)
