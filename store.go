@@ -75,7 +75,7 @@ func (st *Store) Put(key string, value interface{}) error {
 		return errors.Wrap(err, "Store.Put st.db.Put error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (st *Store) Get(key string) ([]byte, error) {
 		return nil, errors.Wrap(err, "Store.Get st.db.Get error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return data, nil
 }
 
@@ -113,7 +113,7 @@ func (st *Store) IsEmpty() (bool, error) {
 		return false, errors.Wrap(err, "Store.IsEmpty iterator.Error error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return true, nil
 }
 
@@ -130,7 +130,7 @@ func (st *Store) GetLastKey() []byte {
 		errors.Wrap(err, "Store.GetLastKey iterator.Error error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return lastValue
 }
 
@@ -152,7 +152,7 @@ func (st *Store) GetAllBlocks() ([]e.Block, error) {
 		return nil, errors.Wrap(err, "Store.GetAllBlocks iterator.Error error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return blocks, nil
 }
 
@@ -186,7 +186,7 @@ func (st *Store) GetAllUser() ([]struct {
 		return nil, errors.Wrap(err, "Store.GetAllUser iterator.Error error")
 	}
 
-	defer st.mu.Unlock()
+	st.mu.Unlock()
 	return results, nil
 }
 
