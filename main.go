@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	e "blockchain/entities"
-	"blockchain/p2p"
 
 	"github.com/pkg/errors"
 )
@@ -19,28 +17,28 @@ var currentBlock e.Block
 
 func main() {
 
-	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
-	port := flag.String("port", "4000", "Port to enable network connection")
-	flag.Parse()
+	// hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
+	// port := flag.String("port", "4000", "Port to enable network connection")
+	// flag.Parse()
 
-	node, err := p2p.NewNode(&p2p.NodeConfig{
-		IP:   *hostIP,
-		Port: *port,
-	})
+	// node, err := p2p.NewNode(&p2p.NodeConfig{
+	// 	IP:   *hostIP,
+	// 	Port: *port,
+	// })
 
-	if err != nil {
-		errors.Wrap(err, "main: p2p.NewNode error")
-	}
+	// if err != nil {
+	// 	errors.Wrap(err, "main: p2p.NewNode error")
+	// }
 
-	blockdb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
-	if err != nil {
-		errors.Wrap(err, "main: NewStore error")
-	}
+	// blockdb, err := NewStore(fmt.Sprintf("node-%s", node.NetworkHost.ID().String()))
+	// if err != nil {
+	// 	errors.Wrap(err, "main: NewStore error")
+	// }
 
-	defer blockdb.Close()
+	// defer blockdb.Close()
 
-	node.MdnsService.Start()
-	node.Start()
+	// node.MdnsService.Start()
+	// node.Start()
 
 	// node.ConnectWithPeers(*peerAddresses)
 
@@ -55,10 +53,10 @@ func main() {
 	// 	Nonce:         0,
 	// }
 
-	// userdb, err := NewStore("userdb")
-	// if err != nil {
-	// 	errors.Wrap(err, "main: NewStore error userdb")
-	// }
+	userdb, err := NewStore("userdb")
+	if err != nil {
+		errors.Wrap(err, "main: NewStore error userdb")
+	}
 
 	// userdb.Put(node.NetworkHost.ID().String(), data)
 	// defer userdb.Close()
@@ -82,38 +80,38 @@ func main() {
 	// }
 	// defer userdb.Close()
 
-	// blockdb, err := NewStore("blockchain")
-	// if err != nil {
-	// 	errors.Wrap(err, "NewStore error blockchain")
-	// }
+	blockdb, err := NewStore("blockchain")
+	if err != nil {
+		errors.Wrap(err, "NewStore error blockchain")
+	}
 	// defer blockdb.Close()
 
-	// cadenaDeUser := []string{"Julio", "Vania", "Profesor"}
+	cadenaDeUser := []string{"Julio", "Vania", "Profesor"}
 
-	// for _, user := range cadenaDeUser {
-	// 	privKey, publicKey, address := GeneraLlavesYAddress()
+	for _, user := range cadenaDeUser {
+		privKey, publicKey, address := GeneraLlavesYAddress()
 
-	// 	data := &e.User{
-	// 		PrivateKey:    privKey,
-	// 		PublicKey:     publicKey,
-	// 		Nombre:        user,
-	// 		Password:      "asd",
-	// 		Nonce:         0,
-	// 		AccuntBalence: 1000,
-	// 	}
+		data := &e.User{
+			PrivateKey:    privKey,
+			PublicKey:     publicKey,
+			Nombre:        user,
+			Password:      "asd",
+			Nonce:         0,
+			AccuntBalence: 1000,
+		}
 
-	// 	err = userdb.Put(address, data)
-	// 	if err != nil {
-	// 		errors.Wrap(err, "userdb.Put error")
-	// 	}
-	// 	fmt.Println("Datos guardados de " + user + ", Address: " + address)
-	// }
+		err = userdb.Put(address, data)
+		if err != nil {
+			errors.Wrap(err, "userdb.Put error")
+		}
+		fmt.Println("Datos guardados de " + user + ", Address: " + address)
+	}
 
-	// fmt.Print("Presiona enter para continuar...")
-	// fmt.Scanln()
-	// ClearScreen()
+	fmt.Print("Presiona enter para continuar...")
+	fmt.Scanln()
+	ClearScreen()
 
-	go menu(blockdb)
+	go menu(blockdb, userdb)
 
 	for {
 		isEmpty, err := blockdb.IsEmpty()
@@ -156,42 +154,42 @@ func main() {
 	}
 }
 
-func menu(blockdb *Store) {
-	// var inputUser, inputPass string
-	// var resultUser e.User
+func menu(blockdb *Store, userdb *Store) {
+	var inputUser, inputPass string
+	var resultUser e.User
 
 	for {
-		// for {
-		// 	fmt.Print("Introduce Address: ")
-		// 	fmt.Scanln(&inputUser)
+		for {
+			fmt.Print("Introduce Address: ")
+			fmt.Scanln(&inputUser)
 
-		// 	fmt.Print("Introduce la contraseña: ")
-		// 	fmt.Scanln(&inputPass)
+			fmt.Print("Introduce la contraseña: ")
+			fmt.Scanln(&inputPass)
 
-		// 	retrievedData, err := userdb.Get(inputUser)
-		// 	if err != nil {
-		// 		errors.Wrap(err, "userdb.Get error")
-		// 	}
+			retrievedData, err := userdb.Get(inputUser)
+			if err != nil {
+				errors.Wrap(err, "userdb.Get error")
+			}
 
-		// 	err = json.Unmarshal(retrievedData, &resultUser)
-		// 	if err != nil {
-		// 		errors.Wrap(err, "user json.Unmarshal error")
-		// 	}
+			err = json.Unmarshal(retrievedData, &resultUser)
+			if err != nil {
+				errors.Wrap(err, "user json.Unmarshal error")
+			}
 
-		// 	if resultUser.Password != "" {
-		// 		if resultUser.Password == inputPass {
-		// 			fmt.Println("Credenciales Correctas.")
-		// 			time.Sleep(2 * time.Second)
-		// 			ClearScreen()
-		// 			break
-		// 		}
+			if resultUser.Password != "" {
+				if resultUser.Password == inputPass {
+					fmt.Println("Credenciales Correctas.")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
+					break
+				}
 
-		// 	} else {
-		// 		fmt.Println("Usuario o contraseña incorrectos.")
-		// 		time.Sleep(2 * time.Second)
-		// 		ClearScreen()
-		// 	}
-		// }
+			} else {
+				fmt.Println("Usuario o contraseña incorrectos.")
+				time.Sleep(2 * time.Second)
+				ClearScreen()
+			}
+		}
 
 		for {
 			var option int
@@ -211,19 +209,19 @@ func menu(blockdb *Store) {
 			switch option {
 			case 1:
 
-				// fmt.Println("Caso 1")
-				// users, err := userdb.GetAllUser()
-				// if err != nil {
-				// 	errors.Wrap(err, "case 1 blockdb.Get error")
-				// }
+				fmt.Println("Caso 1")
+				users, err := userdb.GetAllUser()
+				if err != nil {
+					errors.Wrap(err, "case 1 blockdb.Get error")
+				}
 
-				// fmt.Println("Contactos: ")
+				fmt.Println("Contactos: ")
 
-				// fmt.Println("------------------------------------------------------------------")
-				// for i, user := range users {
-				// 	fmt.Println(fmt.Sprintf("%d. ", i+1) + user.Data.Nombre + " | Addres : " + fmt.Sprintf(user.Key))
-				// }
-				// fmt.Println("------------------------------------------------------------------")
+				fmt.Println("------------------------------------------------------------------")
+				for i, user := range users {
+					fmt.Println(fmt.Sprintf("%d. ", i+1) + user.Data.Nombre + " | Addres : " + fmt.Sprintf(user.Key))
+				}
+				fmt.Println("------------------------------------------------------------------")
 
 				fmt.Print("Presiona enter para continuar...")
 				fmt.Scanln()
