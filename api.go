@@ -1,3 +1,4 @@
+// api.go
 package main
 
 import (
@@ -5,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
 
-func api() {
-	//copy paste del main
+var userdb Store
+var blockdb Store
 
+func StartServer() {
+	var err error
 	userdb, err := NewStore("userdb")
 	if err != nil {
 		errors.Wrap(err, "NewStore error userdb")
@@ -25,106 +29,138 @@ func api() {
 	}
 	defer blockdb.Close()
 
-	//rutas
+	router := mux.NewRouter()
 
-	router := gin.Default()
-	router.GET("/block/:ID", getBlock(blockdb))
-	router.POST("/transaction", newTransaction(blockdb, userdb))
+	// Definir rutas para la API
+	router.HandleFunc("/transacciones", CrearNuevaTransaccion).Methods("POST")
+	router.HandleFunc("/bloque/{index}", ConsultarPorBloque).Methods("GET")
+	router.HandleFunc("/ultima-transaccion", ConsultarUltimaTransaccion).Methods("GET")
 
-	router.Run("localhost:3000")
+	// Iniciar el servidor en el puerto 3000
+	fmt.Println("Servidor iniciado en el puerto 3000")
+	http.ListenAndServe(":3000", router)
 }
 
-func getBlock(blockdb *Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		//hacer case 5 aqui
-		index := c.Param("ID")
+func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request) {
+	var tx e.Transaction
+	err := json.NewDecoder(r.Body).Decode(&tx)
+	if err != nil {
+		http.Error(w, "Error al decodificar la transacción", http.StatusBadRequest)
+		return
+	}
 
+	// Obtener el usuario actual desde la base de datos
+	retrievedData, err := userdb.Get(tx.Sender)
+	if err != nil {
+		http.Error(w, "Error al obtener el usuario de la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	var resultUser e.User
+	err = json.Unmarshal(retrievedData, &resultUser)
+	if err != nil {
+		http.Error(w, "Error al decodificar el usuario", http.StatusInternalServerError)
+		return
+	}
+
+	// Verificar si el usuario tiene saldo suficiente
+	if tx.Amount > resultUser.AccuntBalence {
+		http.Error(w, "No tienes saldo suficiente", http.StatusForbidden)
+		return
+	}
+
+	// Firmar la transacción
+	err = FirmaTransaccion(&tx, resultUser.PrivateKey)
+	if err != nil {
+		http.Error(w, "Error al firmar la transacción", http.StatusInternalServerError)
+		return
+	}
+
+	// Agregar la transacción al bloque actual
+	currentBlock.Transactions = append(currentBlock.Transactions, tx)
+
+	// Actualizar el nonce y el saldo del usuario
+	resultUser.Nonce++
+	resultUser.AccuntBalence -= tx.Amount
+
+	err = userdb.Put(tx.Sender, resultUser)
+	if err != nil {
+		http.Error(w, "Error al actualizar el usuario en la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	// Actualizar el saldo del destinatario
+	recipientData, err := userdb.Get(tx.Recipient)
+	if err != nil {
+		http.Error(w, "Error al obtener el destinatario de la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	var recipientResult e.User
+	err = json.Unmarshal(recipientData, &recipientResult)
+	if err != nil {
+		http.Error(w, "Error al decodificar el destinatario", http.StatusInternalServerError)
+		return
+	}
+
+	recipientResult.AccuntBalence += tx.Amount
+
+	err = userdb.Put(tx.Recipient, recipientResult)
+	if err != nil {
+		http.Error(w, "Error al actualizar el destinatario en la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	// Guardar el bloque actualizado en la base de datos
+	key := fmt.Sprintf("%05d", currentBlock.Index)
+	err = blockdb.Put(key, currentBlock)
+	if err != nil {
+		http.Error(w, "Error al guardar el bloque en la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	// Responder con el resultado de la transacción
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(tx)
+}
+
+func ConsultarPorBloque(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	index, err := strconv.Atoi(params["index"])
+	if err != nil {
+		http.Error(w, "Error al convertir el índice del bloque", http.StatusBadRequest)
+		return
+	}
+
+	// Obtener el bloque correspondiente al índice
+	var retrievedData []byte
+	if index == currentBlock.Index {
+		retrievedData, err = json.Marshal(currentBlock)
+	} else {
 		key := fmt.Sprintf("%05d", index)
-
-		retrievedData, err := blockdb.Get(key)
-
-		if err != nil {
-			return
-		}
-
-		var resultBlock e.Block
-		err = json.Unmarshal(retrievedData, &resultBlock)
-
-		//se envia estado y resultado
-		c.IndentedJSON(http.StatusOK, resultBlock)
+		retrievedData, err = blockdb.Get(key)
 	}
+
+	if err != nil {
+		http.Error(w, "Error al obtener el bloque de la base de datos", http.StatusInternalServerError)
+		return
+	}
+
+	// Enviar el bloque como respuesta
+	w.WriteHeader(http.StatusOK)
+	w.Write(retrievedData)
 }
 
-/*
-func getLastTransaction(c *gin.Context) {
-	//hacer last
-
-	//se envia estado
-	c.IndentedJSON(http.StatusOK, lastTransaction)
-}
-
-*/
-
-func newTransaction(blockdb *Store, userdb *Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var inputUser string
-		var recipient string
-		var amount float64
-		var resultUser User
-
-		//hay que ver que pedir
-
-		tx := &e.Transaction{
-			Sender:    inputUser,
-			Recipient: recipient,
-			Amount:    amount,
-			Nonce:     resultUser.Nonce + 1,
-		}
-
-		FirmaTransaccion(tx, resultUser.PrivateKey)
-
-		currentBlock.Transactions = append(currentBlock.Transactions, *tx)
-
-		fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-		fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-
-		resultUser.Nonce = resultUser.Nonce + 1
-		resultUser.AccuntBalence = resultUser.AccuntBalence - amount
-
-		err := userdb.Put(inputUser, resultUser)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "error put"})
-		}
-
-		recipientPut, err := userdb.Get(recipient)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "no existe o error"})
-		}
-
-		var recipientResult e.User
-		err = json.Unmarshal(recipientPut, &recipientResult)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-		}
-
-		recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
-
-		err = userdb.Put(recipient, recipientResult)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "juserdb.Put error"})
-		}
-
-		newResult, err := userdb.Get(inputUser)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "userdb.Get error"})
-		}
-
-		err = json.Unmarshal(newResult, &resultUser)
-		if err != nil {
-			c.IndentedJSON(http.StatusNotFound, gin.H{"message": "json.Unmarshal error"})
-		}
-
-		//se envia estado ok
-		c.IndentedJSON(http.StatusCreated, tx)
+func ConsultarUltimaTransaccion(w http.ResponseWriter, r *http.Request) {
+	// Obtener la última transacción del bloque actual
+	if len(currentBlock.Transactions) == 0 {
+		http.Error(w, "No hay transacciones en el bloque actual", http.StatusNotFound)
+		return
 	}
+
+	lastTransaction := currentBlock.Transactions[len(currentBlock.Transactions)-1]
+
+	// Enviar la última transacción como respuesta
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(lastTransaction)
 }
