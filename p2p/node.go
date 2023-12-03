@@ -26,11 +26,13 @@ type Node struct {
 	ConnectedPeers map[string]*peer.AddrInfo
 	Port           string
 	mu             sync.Mutex
+	fullNode       bool
 }
 
 type NodeConfig struct {
-	IP   string
-	Port string
+	IP       string
+	Port     string
+	FullNode bool
 }
 
 func NewNode(config *NodeConfig) (*Node, error) {
@@ -40,7 +42,6 @@ func NewNode(config *NodeConfig) (*Node, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "p2p: NewNode libp2p.New error")
 	}
-
 	peerInfo := peer.AddrInfo{
 		ID:    host.ID(),
 		Addrs: host.Addrs(),
@@ -68,6 +69,7 @@ func NewNode(config *NodeConfig) (*Node, error) {
 		MdnsService:    mdnsService,
 		ConnectedPeers: make(map[string]*peer.AddrInfo),
 		Port:           config.Port,
+		fullNode:       config.FullNode,
 	}
 
 	return notifee.node, nil
@@ -96,12 +98,12 @@ func (n *Node) ConnectWithPeers(peerAddress string) error {
 		fmt.Printf("%s with peer %s", err.Error(), peerAddress)
 		return err
 	}
+	fmt.Println("--------------------------------------------------")
 	fmt.Printf("Conectado con %s\n", peerAddrInfo.ID)
 	fmt.Println("--------------------------------------------------")
 	n.mu.Unlock()
 
 	n.ConnectedPeers[peerAddrInfo.String()] = peerAddrInfo
-
 	return nil
 }
 
@@ -113,5 +115,5 @@ func (n *discoveryveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	peerAddress := fmt.Sprintf("%s/p2p/%s", pi.Addrs[0].String(), pi.ID.String())
 	fmt.Println("--------------------------------------------------")
 	fmt.Printf("Peer encontrado: %s\n", peerAddress)
-	n.node.ConnectWithPeers(peerAddress)
+	fmt.Println("--------------------------------------------------")
 }

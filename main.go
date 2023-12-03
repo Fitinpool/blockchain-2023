@@ -12,65 +12,79 @@ import (
 
 	e "blockchain/entities"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"blockchain/p2p"
 
 	"github.com/pkg/errors"
 )
 
 var currentBlock e.Block
+var peer_address string
+var chGeneral *p2p.Channel
+var chFull *p2p.Channel
 
 func main() {
 
 	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
 	port := flag.String("port", "4000", "Port to enable network connection")
-	protocol := flag.String("protocol", "/xulo/1.0.0", "Protocol to enable network connection")
+	protocol := flag.String("protocol", p2p.Protocol, "Protocol to enable network connection")
+	peer := flag.String("peer", "", "Peer multiaddress to connect to")
+	fullNode := flag.Bool("full-node", false, "Enable full node")
 	flag.Parse()
 
 	node, err := p2p.NewNode(&p2p.NodeConfig{
-		IP:   *hostIP,
-		Port: *port,
+		IP:       *hostIP,
+		Port:     *port,
+		FullNode: *fullNode,
 	})
 
 	if err != nil {
 		errors.Wrap(err, "main: p2p.NewNode error")
 	}
 
-	node.MdnsService.Start()
-
 	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
 	if err != nil {
-		errors.Wrap(err, "NewStore error blockchain")
+		errors.Wrap(err, "main: blockNodedb NewStore error")
 	}
 	defer blockNodedb.Close()
 
 	userNodedb, err := NewStore(fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
 	if err != nil {
-		errors.Wrap(err, "NewStore error blockchain")
+		errors.Wrap(err, "main: userNodedb NewStore error")
 	}
 	defer userNodedb.Close()
 
-	node.SetupStreamHandler(context.Background(), node.HandleStream)
-	node.Start()
+	// node.SetupStreamHandler(context.Background(), node.HandleStream)
+	// node.Start()
+
+	gossipSub, err := pubsub.NewGossipSub(context.Background(), node.NetworkHost)
+	if err != nil {
+		panic(err)
+	}
+
+	chGeneral = p2p.JoinChannel(node, gossipSub, true, p2p.ChannelGeneral)
+	if *fullNode {
+		fmt.Println("Full Node")
+		chFull = p2p.JoinChannel(node, gossipSub, false, p2p.ChannelFullNode)
+	} else {
+		chFull = p2p.JoinChannel(node, gossipSub, true, p2p.ChannelFullNode)
+	}
+
+	if *peer != "" {
+		node.ConnectWithPeers(*peer)
+	}
 
 	if *protocol == p2p.Protocol {
 
 		CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
 		CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
-
-		for _, peer := range node.ConnectedPeers {
-			stream, error := node.NetworkHost.NewStream(context.Background(), peer.ID, p2p.ProtocolDataSharing)
-			if error != nil {
-				errors.Wrap(error, "main: node.NetworkHost.NewStream error")
-			}
-			node.HandleStream(stream)
-		}
-
 		go menu(blockNodedb, userNodedb, node)
 
 		for {
 			isEmpty, err := blockNodedb.IsEmpty()
 			if err != nil {
-				errors.Wrap(err, "blockdb.IsEmpty error")
+				errors.Wrap(err, "main: blockdb.IsEmpty error")
 			}
 			if isEmpty {
 				currentBlock = CreateMainBlock()
@@ -80,19 +94,19 @@ func main() {
 
 				err = blockNodedb.Put(key, currentBlock)
 				if err != nil {
-					errors.Wrap(err, "blockNodedb.Put error")
+					errors.Wrap(err, "main: blockNodedb.Put error")
 				}
 			} else {
 
 				lastValues := blockNodedb.GetLastKey()
 				if err != nil {
-					errors.Wrap(err, "blockNodedb.GetLastKey error")
+					errors.Wrap(err, "main: blockNodedb.GetLastKey error")
 				}
 
 				var result e.Block
 				err = json.Unmarshal(lastValues, &result)
 				if err != nil {
-					errors.Wrap(err, "json.unmarshal error")
+					errors.Wrap(err, "main: json.unmarshal error")
 				}
 
 				currentBlock = GenerateBlock(result.Index+1, result.Hash)
@@ -101,7 +115,7 @@ func main() {
 
 				err = blockNodedb.Put(key, currentBlock)
 				if err != nil {
-					errors.Wrap(err, "blockdb.Put error")
+					errors.Wrap(err, "main: blockdb.Put error")
 				}
 
 			}
@@ -172,6 +186,16 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 
 				privKey, publicKey, address := GeneraLlavesYAddress()
 
+				// dataString := fmt.Sprintf(`{
+				//     PrivateKey:    %v,
+				//     PublicKey:     %v,
+				//     Nombre:        %s,
+				//     Password:      %s,
+				//     Nonce:         %d,
+				//     AccuntBalence: %d,
+				// 	Address:       %s,
+				// }`, privKey, publicKey, userRegister, passRegister, 0, 1000, address)
+
 				data := &e.User{
 					PrivateKey:    privKey,
 					PublicKey:     publicKey,
@@ -181,17 +205,26 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 					AccuntBalence: 1000,
 				}
 
+				peer_address = address
 				err := userdb.Put(address, data)
 
 				if err != nil {
 					errors.Wrap(err, "userdb.Put error")
 				}
 
+				// for _, peer := range node.ConnectedPeers {
+				// 	s, error := node.NetworkHost.NewStream(context.Background(), peer.ID, p2p.ProtocolDataSharing)
+				// 	if error != nil {
+				// 		errors.Wrap(error, "main: node.NetworkHost.NewStream error")
+				// 	}
+				// 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+				// 	node.UserPutShareData(dataString, rw)
+				// }
+
 				fmt.Println("Datos guardados de " + userRegister + ", Address: " + address)
 				fmt.Print("Presiona enter para continuar...")
 				fmt.Scanln()
 				ClearScreen()
-				bandera = true
 
 			default:
 				fmt.Println("Opcion no valida")
@@ -206,7 +239,7 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 			var option int
 			var bandera bool = false
 			fmt.Println("\n---------- Menú ----------")
-			fmt.Println("1. Ver Contactos")
+			fmt.Println("1. Ver contactos")
 			fmt.Println("2. Realizar transacción")
 			fmt.Println("3. Mostrar transacciones")
 			fmt.Println("4. Buscar transacción específica")
@@ -216,21 +249,22 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 			fmt.Println("8. Salir")
 			fmt.Print("Elige una opción: ")
 			fmt.Scan(&option)
+			chGeneral.SubscribeChannelMessage(chGeneral.Subscriber, chFull, context.Background(), node)
 
 			switch option {
 			case 1:
-
-				fmt.Println("Caso 1")
 				users, err := userdb.GetAllUser()
 				if err != nil {
 					errors.Wrap(err, "case 1 blockdb.Get error")
 				}
 
-				fmt.Println("Contactos: ")
+				fmt.Println("Addresses: ")
 
 				fmt.Println("------------------------------------------------------------------")
 				for i, user := range users {
-					fmt.Println(fmt.Sprintf("%d. ", i+1) + user.Data.Nombre + " | Addres : " + fmt.Sprintf(user.Key))
+					if fmt.Sprintf(user.Key) != inputUser {
+						fmt.Println(fmt.Sprintf("%d. ", i+1) + user.Data.Nombre + " | Address : " + fmt.Sprintf(user.Key))
+					}
 				}
 				fmt.Println("------------------------------------------------------------------")
 
@@ -242,7 +276,7 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 				var recipient string
 				var amount float64
 
-				fmt.Printf("Tienes un saldo de : %f", resultUser.AccuntBalence)
+				fmt.Printf("Saldo : %f", resultUser.AccuntBalence)
 				fmt.Println("")
 				fmt.Print("Introduce el destinatario: ")
 				fmt.Scanln(&recipient)
@@ -264,7 +298,16 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 					Nonce:     resultUser.Nonce + 1,
 				}
 
+				txShare := fmt.Sprintf(`{
+					Sender:    %s,
+					Recipient: %s,
+					Amount:    %f,
+					Nonce:     %d,
+				)`, inputUser, recipient, amount, resultUser.Nonce+1)
+
 				FirmaTransaccion(tx, resultUser.PrivateKey)
+
+				chGeneral.PublishChannelMessage(context.Background(), chGeneral.Topic, txShare)
 
 				currentBlock.Transactions = append(currentBlock.Transactions, *tx)
 
