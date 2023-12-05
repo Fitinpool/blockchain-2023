@@ -49,6 +49,16 @@ func main() {
 
 	fmt.Printf("Nodo iniciado con ID: %s\n", h.ID().String())
 
+	// blockdb, err := NewStore("blockchain")
+	// if err != nil {
+	// 	errors.Wrap(err, "main: block NewStore error")
+	// }
+
+	userdb, err := NewStore("userdb")
+	if err != nil {
+		errors.Wrap(err, "main: user NewStore error")
+	}
+
 	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", h.ID().String()))
 	if err != nil {
 		errors.Wrap(err, "main: blockNodedb NewStore error")
@@ -60,16 +70,6 @@ func main() {
 		errors.Wrap(err, "main: userNodedb NewStore error")
 	}
 	defer userNodedb.Close()
-
-	// blockdb, err := NewStore("blockchain")
-	// if err != nil {
-	// 	errors.Wrap(err, "main: block NewStore error")
-	// }
-
-	userdb, err := NewStore("userdb")
-	if err != nil {
-		errors.Wrap(err, "main: user NewStore error")
-	}
 
 	// Conectar a otro nodo si se proporciona una dirección
 	if *connectTo != "" {
