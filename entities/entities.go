@@ -17,12 +17,12 @@ type Block struct {
 }
 
 type User struct {
-	PrivateKey    []byte
-	PublicKey     []byte
-	Nombre        string
-	Password      string
-	Nonce         int
-	AccuntBalence float64
+	PrivateKey    []byte  `json:"private_key"`
+	PublicKey     []byte  `json:"public_key"`
+	Nombre        string  `json:"nombre"`
+	Password      string  `json:"password"`
+	Nonce         int     `json:"nonce"`
+	AccuntBalence float64 `json:"accunt_balence"`
 }
 
 type Ledger struct {

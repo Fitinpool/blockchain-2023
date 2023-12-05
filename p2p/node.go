@@ -24,19 +24,19 @@ type Node struct {
 	NetworkHost    host.Host
 	MdnsService    mdns.Service
 	ConnectedPeers map[string]*peer.AddrInfo
-	Port           string
+	Port           int
 	mu             sync.Mutex
 	fullNode       bool
 }
 
 type NodeConfig struct {
 	IP       string
-	Port     string
+	Port     int
 	FullNode bool
 }
 
 func NewNode(config *NodeConfig) (*Node, error) {
-	listenAddress := fmt.Sprintf("/ip4/%s/tcp/%s", config.IP, config.Port)
+	listenAddress := fmt.Sprintf("/ip4/%s/tcp/%d", config.IP, config.Port)
 	address := libp2p.ListenAddrStrings(listenAddress)
 	host, err := libp2p.New(address)
 	if err != nil {

@@ -8,11 +8,15 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	e "blockchain/entities"
 
+	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 
 	"blockchain/p2p"
 
@@ -20,66 +24,338 @@ import (
 )
 
 var currentBlock e.Block
-var peer_address string
-var chGeneral *p2p.Channel
-var chFull *p2p.Channel
+var state bool = false
+var resultUser e.User
+var inputUser string
 
 func main() {
 
-	hostIP := flag.String("host-address", "0.0.0.0", "Default address to run node")
-	port := flag.String("port", "4000", "Port to enable network connection")
+	port := flag.Int("port", 4000, "Puerto de escucha para el nodo")
 	protocol := flag.String("protocol", p2p.Protocol, "Protocol to enable network connection")
-	peer := flag.String("peer", "", "Peer multiaddress to connect to")
-	fullNode := flag.Bool("full-node", false, "Enable full node")
+	connectTo := flag.String("connect", "", "Dirección multiaddr del nodo a conectar")
+	isPublisher := flag.Bool("publish", false, "Define si el nodo publicará mensajes")
 	flag.Parse()
 
-	node, err := p2p.NewNode(&p2p.NodeConfig{
-		IP:       *hostIP,
-		Port:     *port,
-		FullNode: *fullNode,
-	})
+	ctx := context.Background()
 
+	// Crear un host libp2p
+	h, err := libp2p.New(
+		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", *port)),
+	)
 	if err != nil {
-		errors.Wrap(err, "main: p2p.NewNode error")
+		panic(err)
 	}
+	defer h.Close()
 
-	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
+	fmt.Printf("Nodo iniciado con ID: %s\n", h.ID().String())
+
+	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", h.ID().String()))
 	if err != nil {
 		errors.Wrap(err, "main: blockNodedb NewStore error")
 	}
 	defer blockNodedb.Close()
 
-	userNodedb, err := NewStore(fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
+	userNodedb, err := NewStore(fmt.Sprintf("node-user-%s", h.ID().String()))
 	if err != nil {
 		errors.Wrap(err, "main: userNodedb NewStore error")
 	}
 	defer userNodedb.Close()
 
-	// node.SetupStreamHandler(context.Background(), node.HandleStream)
-	// node.Start()
+	// blockdb, err := NewStore("blockchain")
+	// if err != nil {
+	// 	errors.Wrap(err, "main: block NewStore error")
+	// }
 
-	gossipSub, err := pubsub.NewGossipSub(context.Background(), node.NetworkHost)
+	userdb, err := NewStore("userdb")
+	if err != nil {
+		errors.Wrap(err, "main: user NewStore error")
+	}
+
+	// Conectar a otro nodo si se proporciona una dirección
+	if *connectTo != "" {
+		ma, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/4000/p2p/%s", *connectTo))
+		if err != nil {
+			panic(err)
+		}
+
+		addrInfo, err := peer.AddrInfoFromP2pAddr(ma)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := h.Connect(ctx, *addrInfo); err != nil {
+			panic(err)
+		}
+		fmt.Println("Conectado a", *connectTo)
+	}
+
+	// Configurar pubsub
+	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
 		panic(err)
 	}
 
-	chGeneral = p2p.JoinChannel(node, gossipSub, true, p2p.ChannelGeneral)
-	if *fullNode {
-		fmt.Println("Full Node")
-		chFull = p2p.JoinChannel(node, gossipSub, false, p2p.ChannelFullNode)
-	} else {
-		chFull = p2p.JoinChannel(node, gossipSub, true, p2p.ChannelFullNode)
+	// Suscribirse a un tópico
+	topicBroadcast, err := ps.Join("broadcast")
+	if err != nil {
+		panic(err)
 	}
 
-	if *peer != "" {
-		node.ConnectWithPeers(*peer)
+	subBroadcast, err := topicBroadcast.Subscribe()
+	if err != nil {
+		panic(err)
 	}
+
+	topicFullNode, err := ps.Join("full-node")
+	if err != nil {
+		panic(err)
+	}
+
+	subFullNode, err := topicFullNode.Subscribe()
+	if err != nil {
+		panic(err)
+	}
+
+	// // Publicar mensajes si es un nodo publicador
+	// if *isPublisher {
+	// 	go func() {
+	// 		for {
+	// 			time.Sleep(5 * time.Second)
+	// 			err := topic.Publish(ctx, []byte("Hello, world!"))
+	// 			if err != nil {
+	// 				panic(err)
+	// 			}
+	// 			fmt.Println("Mensaje publicado")
+	// 		}
+	// 	}()
+	// }
+
+	// go func() {
+	// 	for {
+	// 		msg, err := sub.Next(ctx)
+	// 		if err != nil {
+	// 			panic(err)
+	// 		}
+
+	// 		fmt.Printf("Mensaje recibido: %s\n", string(msg.Data))
+	// 	}
+	// }()
+
+	go func() {
+		for {
+			if *isPublisher {
+				msg, err := subFullNode.Next(ctx)
+				if err != nil {
+					panic(err)
+				}
+
+				protocoloFullNode := strings.Split(string(msg.Data), ";")
+
+				// fmt.Println("Mensaje recibido: " + protocoloFullNode[1])
+
+				// retrievedData, err := userdb.GetAllUser()
+				// if err != nil {
+				// 	errors.Wrap(err, "userdb.Get error")
+				// }
+
+				// for _, user := range retrievedData {
+				// 	fmt.Println(string(user.Data.Password))
+				// }
+
+				if protocoloFullNode[0] == "nuevo-user" {
+					var jsonTemp map[string]interface{}
+
+					err = json.Unmarshal([]byte(protocoloFullNode[1]), &jsonTemp)
+					if err != nil {
+						errors.Wrap(err, "main: json.Unmarshal error")
+					}
+
+					userTemp := e.User{
+						PrivateKey:    []byte(jsonTemp["private_key"].(string)),
+						PublicKey:     []byte(jsonTemp["public_key"].(string)),
+						Nombre:        jsonTemp["nombre"].(string),
+						Password:      jsonTemp["password"].(string),
+						Nonce:         int(jsonTemp["nonce"].(float64)),
+						AccuntBalence: jsonTemp["accunt_balance"].(float64),
+					}
+
+					// err = json.Unmarshal([]byte(protocoloFullNode[1]), &userTemp)
+					// if err != nil {
+					// 	errors.Wrap(err, "main: json.Unmarshal error")
+					// }
+
+					err = userNodedb.Put(string(protocoloFullNode[2]), userTemp)
+
+					if err != nil {
+						errors.Wrap(err, "main: userNodedb.Put error")
+					}
+
+					err = userdb.Put(string(protocoloFullNode[2]), userTemp)
+					if err != nil {
+						errors.Wrap(err, "main: userdb.Put error")
+					}
+
+					err := topicBroadcast.Publish(ctx, []byte("aprobado-user;"+protocoloFullNode[1]+";"+protocoloFullNode[2]))
+					if err != nil {
+						panic(err)
+					}
+
+					state = true
+				} else if protocoloFullNode[0] == "nueva-transaccion" {
+
+					var jsonTemp map[string]interface{}
+
+					err = json.Unmarshal([]byte(protocoloFullNode[1]), &jsonTemp)
+					if err != nil {
+						errors.Wrap(err, "main: json.Unmarshal error")
+					}
+
+					txTemp := &e.Transaction{
+						Sender:    jsonTemp["sender"].(string),
+						Recipient: jsonTemp["recipient"].(string),
+						Amount:    jsonTemp["amount"].(float64),
+						Nonce:     int(jsonTemp["nonce"].(float64)),
+					}
+
+					FirmaTransaccion(txTemp, resultUser.PrivateKey)
+
+					currentBlock.Transactions = append(currentBlock.Transactions, *txTemp)
+
+					resultUser.Nonce = resultUser.Nonce + 1
+					resultUser.AccuntBalence = resultUser.AccuntBalence - jsonTemp["amount"].(float64)
+
+					err = userdb.Put(inputUser, resultUser)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					err = userNodedb.Put(inputUser, resultUser)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					recipientPut, err := userdb.Get(jsonTemp["recipient"].(string))
+					if err != nil {
+						errors.Wrap(err, "No existe o Error")
+					}
+
+					var recipientResult e.User
+					err = json.Unmarshal(recipientPut, &recipientResult)
+					if err != nil {
+						errors.Wrap(err, "case 2 json.Unmarshal error")
+					}
+
+					recipientResult.AccuntBalence = recipientResult.AccuntBalence + jsonTemp["amount"].(float64)
+
+					err = userdb.Put(jsonTemp["recipient"].(string), recipientResult)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					err = userNodedb.Put(jsonTemp["recipient"].(string), recipientResult)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					newResult, err := userdb.Get(inputUser)
+					if err != nil {
+						errors.Wrap(err, "userdb.Get error")
+					}
+
+					err = json.Unmarshal(newResult, &resultUser)
+					if err != nil {
+						errors.Wrap(err, "case 2 json.Unmarshal error")
+					}
+
+					err = topicBroadcast.Publish(ctx, []byte("aprobado-block;"+protocoloFullNode[1]))
+					if err != nil {
+						panic(err)
+					}
+
+					state = true
+				}
+
+			} else {
+				msg, err := subBroadcast.Next(ctx)
+				if err != nil {
+					panic(err)
+				}
+
+				protocoloBroadcast := strings.Split(string(msg.Data), ";")
+
+				if protocoloBroadcast[0] == "aprobado-user" {
+					// var userTemp e.User
+
+					// err = json.Unmarshal([]byte(protocoloBroadcast[1]), &userTemp)
+					// if err != nil {
+					// 	errors.Wrap(err, "main: json.Unmarshal error")
+					// }
+
+					var jsonTemp map[string]interface{}
+
+					err = json.Unmarshal([]byte(protocoloBroadcast[1]), &jsonTemp)
+					if err != nil {
+						errors.Wrap(err, "main: json.Unmarshal error")
+					}
+
+					userTemp := e.User{
+						PrivateKey:    []byte(jsonTemp["private_key"].(string)),
+						PublicKey:     []byte(jsonTemp["public_key"].(string)),
+						Nombre:        jsonTemp["nombre"].(string),
+						Password:      jsonTemp["password"].(string),
+						Nonce:         int(jsonTemp["nonce"].(float64)),
+						AccuntBalence: jsonTemp["accunt_balance"].(float64),
+					}
+
+					err = userNodedb.Put(string(protocoloBroadcast[2]), userTemp)
+
+					if err != nil {
+						errors.Wrap(err, "main: userNodedb.Put error")
+					}
+
+					state = true
+				} else if protocoloBroadcast[0] == "aprobado-block" {
+					var jsonTemp map[string]interface{}
+
+					err = json.Unmarshal([]byte(protocoloBroadcast[1]), &jsonTemp)
+					if err != nil {
+						errors.Wrap(err, "main: json.Unmarshal error")
+					}
+
+					err = userNodedb.Put(inputUser, resultUser)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					recipientPut, err := userNodedb.Get(jsonTemp["recipient"].(string))
+					if err != nil {
+						errors.Wrap(err, "No existe o Error")
+					}
+
+					var recipientResult e.User
+					err = json.Unmarshal(recipientPut, &recipientResult)
+					if err != nil {
+						errors.Wrap(err, "case 2 json.Unmarshal error")
+					}
+
+					recipientResult.AccuntBalence = recipientResult.AccuntBalence + jsonTemp["amount"].(float64)
+
+					err = userNodedb.Put(jsonTemp["recipient"].(string), recipientResult)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
+
+					state = true
+				}
+			}
+		}
+	}()
 
 	if *protocol == p2p.Protocol {
 
-		CopyStore("blockchain", fmt.Sprintf("node-block-%s", node.NetworkHost.ID().String()))
-		CopyStore("userdb", fmt.Sprintf("node-user-%s", node.NetworkHost.ID().String()))
-		go menu(blockNodedb, userNodedb, node)
+		CopyStore("blockchain", fmt.Sprintf("node-block-%s", h.ID().String()))
+		CopyStore("userdb", fmt.Sprintf("node-user-%s", h.ID().String()))
+		go menu(blockNodedb, userNodedb, topicFullNode, subBroadcast)
 
 		for {
 			isEmpty, err := blockNodedb.IsEmpty()
@@ -126,9 +402,8 @@ func main() {
 
 }
 
-func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
-	var inputUser, inputPass string
-	var resultUser e.User
+func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadcast *pubsub.Subscription) {
+	var inputPass string
 
 	for {
 		for {
@@ -186,45 +461,31 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 
 				privKey, publicKey, address := GeneraLlavesYAddress()
 
-				// dataString := fmt.Sprintf(`{
-				//     PrivateKey:    %v,
-				//     PublicKey:     %v,
-				//     Nombre:        %s,
-				//     Password:      %s,
-				//     Nonce:         %d,
-				//     AccuntBalence: %d,
-				// 	Address:       %s,
-				// }`, privKey, publicKey, userRegister, passRegister, 0, 1000, address)
+				dataString := fmt.Sprintf(`{
+					"private_key":    "%v",
+					"public_key":     "%v",
+					"nombre":        "%s",
+					"password":      "%s",
+					"nonce":         %d,
+					"accunt_balance": %d
+				};%s`, privKey, publicKey, userRegister, passRegister, 0, 1000, address)
 
-				data := &e.User{
-					PrivateKey:    privKey,
-					PublicKey:     publicKey,
-					Nombre:        userRegister,
-					Password:      passRegister,
-					Nonce:         0,
-					AccuntBalence: 1000,
+				topicFullNode.Publish(context.Background(), []byte("nuevo-user;"+dataString))
+
+				for {
+					if state {
+						break
+					}
+					fmt.Print("Esperando respuesta...")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
 				}
-
-				peer_address = address
-				err := userdb.Put(address, data)
-
-				if err != nil {
-					errors.Wrap(err, "userdb.Put error")
-				}
-
-				// for _, peer := range node.ConnectedPeers {
-				// 	s, error := node.NetworkHost.NewStream(context.Background(), peer.ID, p2p.ProtocolDataSharing)
-				// 	if error != nil {
-				// 		errors.Wrap(error, "main: node.NetworkHost.NewStream error")
-				// 	}
-				// 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				// 	node.UserPutShareData(dataString, rw)
-				// }
 
 				fmt.Println("Datos guardados de " + userRegister + ", Address: " + address)
 				fmt.Print("Presiona enter para continuar...")
 				fmt.Scanln()
 				ClearScreen()
+				state = false
 
 			default:
 				fmt.Println("Opcion no valida")
@@ -249,7 +510,6 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 			fmt.Println("8. Salir")
 			fmt.Print("Elige una opción: ")
 			fmt.Scan(&option)
-			chGeneral.SubscribeChannelMessage(chGeneral.Subscriber, chFull, context.Background(), node)
 
 			switch option {
 			case 1:
@@ -291,67 +551,81 @@ func menu(blockdb *Store, userdb *Store, node *p2p.Node) {
 					break
 				}
 
-				tx := &e.Transaction{
-					Sender:    inputUser,
-					Recipient: recipient,
-					Amount:    amount,
-					Nonce:     resultUser.Nonce + 1,
-				}
+				// tx := &e.Transaction{
+				// 	Sender:    inputUser,
+				// 	Recipient: recipient,
+				// 	Amount:    amount,
+				// 	Nonce:     resultUser.Nonce + 1,
+				// }
 
 				txShare := fmt.Sprintf(`{
-					Sender:    %s,
-					Recipient: %s,
-					Amount:    %f,
-					Nonce:     %d,
+					"sender":    %s,
+					"recipient": %s,
+					"amount":    %f,
+					"nonce":     %d,
 				)`, inputUser, recipient, amount, resultUser.Nonce+1)
 
-				FirmaTransaccion(tx, resultUser.PrivateKey)
+				err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare))
+				if err != nil {
+					panic(err)
+				}
 
-				chGeneral.PublishChannelMessage(context.Background(), chGeneral.Topic, txShare)
+				// FirmaTransaccion(tx, resultUser.PrivateKey)
 
-				currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+				// currentBlock.Transactions = append(currentBlock.Transactions, *tx)
 
 				fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-				fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+				fmt.Println("Nonce:" + fmt.Sprint(resultUser.Nonce))
 
-				resultUser.Nonce = resultUser.Nonce + 1
-				resultUser.AccuntBalence = resultUser.AccuntBalence - amount
+				// resultUser.Nonce = resultUser.Nonce + 1
+				// resultUser.AccuntBalence = resultUser.AccuntBalence - amount
 
-				err := userdb.Put(inputUser, resultUser)
-				if err != nil {
-					errors.Wrap(err, "case 2 userdb.Put error")
+				// err = userdb.Put(inputUser, resultUser)
+				// if err != nil {
+				// 	errors.Wrap(err, "case 2 userdb.Put error")
+				// }
+
+				// recipientPut, err := userdb.Get(recipient)
+				// if err != nil {
+				// 	errors.Wrap(err, "No existe o Error")
+				// }
+
+				// var recipientResult e.User
+				// err = json.Unmarshal(recipientPut, &recipientResult)
+				// if err != nil {
+				// 	errors.Wrap(err, "case 2 json.Unmarshal error")
+				// }
+
+				// recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
+
+				// err = userdb.Put(recipient, recipientResult)
+				// if err != nil {
+				// 	errors.Wrap(err, "case 2 userdb.Put error")
+				// }
+
+				// newResult, err := userdb.Get(inputUser)
+				// if err != nil {
+				// 	errors.Wrap(err, "userdb.Get error")
+				// }
+
+				// err = json.Unmarshal(newResult, &resultUser)
+				// if err != nil {
+				// 	errors.Wrap(err, "case 2 json.Unmarshal error")
+				// }
+
+				for {
+					if state {
+						break
+					}
+					fmt.Print("Esperando respuesta...")
+					time.Sleep(2 * time.Second)
+					ClearScreen()
 				}
 
-				recipientPut, err := userdb.Get(recipient)
-				if err != nil {
-					errors.Wrap(err, "No existe o Error")
-				}
-
-				var recipientResult e.User
-				err = json.Unmarshal(recipientPut, &recipientResult)
-				if err != nil {
-					errors.Wrap(err, "case 2 json.Unmarshal error")
-				}
-
-				recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
-
-				err = userdb.Put(recipient, recipientResult)
-				if err != nil {
-					errors.Wrap(err, "case 2 userdb.Put error")
-				}
-
-				newResult, err := userdb.Get(inputUser)
-				if err != nil {
-					errors.Wrap(err, "userdb.Get error")
-				}
-
-				err = json.Unmarshal(newResult, &resultUser)
-				if err != nil {
-					errors.Wrap(err, "case 2 json.Unmarshal error")
-				}
-
-				time.Sleep(2 * time.Second)
+				fmt.Print("Presiona enter para continuar...")
+				fmt.Scanln()
 				ClearScreen()
+				state = false
 			case 3:
 				blocks, err := blockdb.GetAllBlocks()
 				if len(blocks) == 0 {
