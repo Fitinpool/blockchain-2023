@@ -318,6 +318,19 @@ func main() {
 					}
 
 					state = true
+				} else if protocoloBroadcast[0] == "agrega-bloque" {
+
+					var jsonBlock e.Block
+
+					err = json.Unmarshal([]byte(protocoloBroadcast[2]), &jsonBlock)
+					if err != nil {
+						errors.Wrap(err, "main: json.Unmarshal error")
+					}
+
+					err = blockNodedb.Put(protocoloBroadcast[1], jsonBlock)
+					if err != nil {
+						errors.Wrap(err, "case 2 userdb.Put error")
+					}
 				}
 			}
 		}
@@ -335,12 +348,13 @@ func main() {
 				errors.Wrap(err, "main: blockdb.IsEmpty error")
 			}
 			if isEmpty {
-				currentBlock = CreateMainBlock()
-
-				key := fmt.Sprintf("%05d", currentBlock.Index)
-				time.Sleep(60 * time.Second)
 
 				if *isPublisher {
+					currentBlock = CreateMainBlock()
+
+					key := fmt.Sprintf("%05d", currentBlock.Index)
+					time.Sleep(60 * time.Second)
+
 					err = blockNodedb.Put(key, currentBlock)
 					if err != nil {
 						errors.Wrap(err, "main: blockNodedb.Put error")
@@ -357,27 +371,49 @@ func main() {
 					}
 
 					err = topicBroadcast.Publish(ctx, []byte("agrega-bloque;"+key+";"+string(blockString)))
+
+					if err != nil {
+						panic(err)
+					}
 				}
 			} else {
 
-				lastValues := blockNodedb.GetLastKey()
-				if err != nil {
-					errors.Wrap(err, "main: blockNodedb.GetLastKey error")
-				}
+				if *isPublisher {
+					lastValues := blockNodedb.GetLastKey()
+					if err != nil {
+						errors.Wrap(err, "main: blockNodedb.GetLastKey error")
+					}
 
-				var result e.Block
-				err = json.Unmarshal(lastValues, &result)
-				if err != nil {
-					errors.Wrap(err, "main: json.unmarshal error")
-				}
+					var result e.Block
+					err = json.Unmarshal(lastValues, &result)
+					if err != nil {
+						errors.Wrap(err, "main: json.unmarshal error")
+					}
 
-				currentBlock = GenerateBlock(result.Index+1, result.Hash)
-				key := fmt.Sprintf("%05d", currentBlock.Index)
-				time.Sleep(60 * time.Second)
+					currentBlock = GenerateBlock(result.Index+1, result.Hash)
+					key := fmt.Sprintf("%05d", currentBlock.Index)
+					time.Sleep(60 * time.Second)
 
-				err = blockNodedb.Put(key, currentBlock)
-				if err != nil {
-					errors.Wrap(err, "main: blockdb.Put error")
+					err = blockNodedb.Put(key, currentBlock)
+					if err != nil {
+						errors.Wrap(err, "main: blockdb.Put error")
+					}
+
+					err = blockdb.Put(key, currentBlock)
+					if err != nil {
+						errors.Wrap(err, "main: blockdb.Put error")
+					}
+
+					blockString, err := json.Marshal(currentBlock)
+					if err != nil {
+						errors.Wrap(err, "main: json.Marshal error")
+					}
+
+					err = topicBroadcast.Publish(ctx, []byte("agrega-bloque;"+key+";"+string(blockString)))
+
+					if err != nil {
+						panic(err)
+					}
 				}
 
 			}
