@@ -52,6 +52,14 @@ func main() {
 	// 	errors.Wrap(err, "main: block NewStore error")
 	// }
 
+	// CopyStore("blockchain", fmt.Sprintf("node-block-%s", h.ID().String()))
+	// CopyStore("userdb", fmt.Sprintf("node-user-%s", h.ID().String()))
+
+	blockdb, err := NewStore("blockchain")
+	if err != nil {
+		errors.Wrap(err, "main: block NewStore error")
+	}
+
 	userdb, err := NewStore("userdb")
 	if err != nil {
 		errors.Wrap(err, "main: user NewStore error")
@@ -132,6 +140,10 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
+					//imprime la llave privada
+					fmt.Println("llave privada :", []byte(jsonTemp["private_key"].(string)))
+					fmt.Println("llave privada :", jsonTemp["private_key"].(string))
+					fmt.Scanln()
 					userTemp := e.User{
 						PrivateKey:    []byte(jsonTemp["private_key"].(string)),
 						PublicKey:     []byte(jsonTemp["public_key"].(string)),
@@ -163,6 +175,7 @@ func main() {
 					var jsonTrancs map[string]interface{}
 					var jsonUser map[string]interface{}
 
+					fmt.Println("transaccion : " + fmt.Sprintf(protocoloFullNode[1]))
 					err = json.Unmarshal([]byte(protocoloFullNode[1]), &jsonTrancs)
 					if err != nil {
 						errors.Wrap(err, "main: json.Unmarshal error")
@@ -186,7 +199,7 @@ func main() {
 						Nombre:        jsonUser["nombre"].(string),
 						Password:      jsonUser["password"].(string),
 						Nonce:         int(jsonUser["nonce"].(float64)),
-						AccuntBalence: jsonUser["accunt_balance"].(float64),
+						AccuntBalence: jsonUser["accunt_balence"].(float64),
 					}
 
 					FirmaTransaccion(txTemp, userTemp.PrivateKey)
@@ -338,12 +351,10 @@ func main() {
 
 	if *protocol == p2p.Protocol {
 
-		CopyStore("blockchain", fmt.Sprintf("node-block-%s", h.ID().String()))
-		CopyStore("userdb", fmt.Sprintf("node-user-%s", h.ID().String()))
 		go menu(blockNodedb, userNodedb, topicFullNode, subBroadcast)
 
 		for {
-			isEmpty, err := blockNodedb.IsEmpty()
+			isEmpty, err := blockdb.IsEmpty()
 			if err != nil {
 				errors.Wrap(err, "main: blockdb.IsEmpty error")
 			}
@@ -491,7 +502,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 					"password":      "%s",
 					"nonce":         %d,
 					"accunt_balance": %d
-				};%s`, privKey, publicKey, userRegister, passRegister, 0, 1000, address)
+				};%s`, string(privKey), string(publicKey), userRegister, passRegister, 0, 1000, address)
 
 				topicFullNode.Publish(context.Background(), []byte("nuevo-user;"+dataString))
 
@@ -501,7 +512,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 					}
 					fmt.Print("Esperando respuesta...")
 					time.Sleep(2 * time.Second)
-					ClearScreen()
+					// ClearScreen()
 				}
 
 				fmt.Println("Datos guardados de " + userRegister + ", Address: " + address)
@@ -582,20 +593,20 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 				// }
 
 				txShare := fmt.Sprintf(`{
-					"sender":    %s,
-					"recipient": %s,
+					"sender":    "%s",
+					"recipient": "%s",
 					"amount":    %f,
-					"nonce":     %d,
-				)`, inputUser, recipient, amount, resultUser.Nonce+1)
+					"nonce":     %d
+				}`, inputUser, recipient, amount, resultUser.Nonce+1)
 
 				userString := fmt.Sprintf(`{
-					"private_key":        "%s",
-					"public_key":         "%s",
+					"private_key":        "%v",
+					"public_key":         "%v",
 					"nombre":            "%s",
 					"password":          "%s",
 					"nonce":             %d,
 					"accunt_balence":    %f
-				}`, resultUser.PrivateKey, resultUser.PublicKey, resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+				}`, string(resultUser.PrivateKey), string(resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
 
 				err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+inputUser))
 				if err != nil {
