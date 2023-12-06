@@ -24,8 +24,3 @@ type User struct {
 	Nonce         int     `json:"nonce"`
 	AccuntBalence float64 `json:"accunt_balence"`
 }
-
-type Ledger struct {
-	User  *User
-	Block []Block
-}

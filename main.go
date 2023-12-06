@@ -8,31 +8,41 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	e "blockchain/entities"
 
+	"sync"
+
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-
-	"blockchain/p2p"
 
 	"github.com/pkg/errors"
 )
 
 var currentBlock e.Block
 var state bool = false
+var isPublisher bool = false
+
+const (
+	Protocol = "/xulo/1.0.0"
+)
 
 func main() {
 
 	port := flag.Int("port", 4000, "Puerto de escucha para el nodo")
-	protocol := flag.String("protocol", p2p.Protocol, "Protocol to enable network connection")
+	protocol := flag.String("protocol", Protocol, "Protocol to enable network connection")
 	connectTo := flag.String("connect", "", "Dirección multiaddr del nodo a conectar")
-	isPublisher := flag.Bool("publish", false, "Define si el nodo publicará mensajes")
+	flagPublisher := flag.Bool("publish", false, "Define si el nodo publicará mensajes")
 	flag.Parse()
+
+	isPublisher = *flagPublisher
+	mutex := &sync.Mutex{}
 
 	ctx := context.Background()
 
@@ -45,21 +55,10 @@ func main() {
 	}
 	defer h.Close()
 
-	fmt.Printf("Nodo iniciado con ID: %s\n", h.ID().String())
-
-	// blockdb, err := NewStore("blockchain")
-	// if err != nil {
-	// 	errors.Wrap(err, "main: block NewStore error")
-	// }
-
-	// CopyStore("blockchain", fmt.Sprintf("node-block-%s", h.ID().String()))
-	// CopyStore("userdb", fmt.Sprintf("node-user-%s", h.ID().String()))
-
 	blockdb, err := NewStore("blockchain")
 	if err != nil {
 		errors.Wrap(err, "main: block NewStore error")
 	}
-
 	userdb, err := NewStore("userdb")
 	if err != nil {
 		errors.Wrap(err, "main: user NewStore error")
@@ -76,6 +75,9 @@ func main() {
 		errors.Wrap(err, "main: userNodedb NewStore error")
 	}
 	defer userNodedb.Close()
+
+	CopyStore(blockdb, blockNodedb)
+	CopyStore(userdb, userNodedb)
 
 	// Conectar a otro nodo si se proporciona una dirección
 	if *connectTo != "" {
@@ -124,7 +126,7 @@ func main() {
 
 	go func() {
 		for {
-			if *isPublisher {
+			if isPublisher {
 				msg, err := subFullNode.Next(ctx)
 				if err != nil {
 					panic(err)
@@ -140,13 +142,17 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
-					//imprime la llave privada
-					fmt.Println("llave privada :", []byte(jsonTemp["private_key"].(string)))
-					fmt.Println("llave privada :", jsonTemp["private_key"].(string))
-					fmt.Scanln()
+					priv_key_temp, err := stringToByteSlice(jsonTemp["private_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+					public_key_temp, err := stringToByteSlice(jsonTemp["public_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
 					userTemp := e.User{
-						PrivateKey:    []byte(jsonTemp["private_key"].(string)),
-						PublicKey:     []byte(jsonTemp["public_key"].(string)),
+						PrivateKey:    priv_key_temp,
+						PublicKey:     public_key_temp,
 						Nombre:        jsonTemp["nombre"].(string),
 						Password:      jsonTemp["password"].(string),
 						Nonce:         int(jsonTemp["nonce"].(float64)),
@@ -159,23 +165,24 @@ func main() {
 						errors.Wrap(err, "main: userNodedb.Put error")
 					}
 
+					mutex.Lock()
 					err = userdb.Put(string(protocoloFullNode[2]), userTemp)
+					mutex.Unlock()
 					if err != nil {
 						errors.Wrap(err, "main: userdb.Put error")
 					}
 
-					err := topicBroadcast.Publish(ctx, []byte("aprobado-user;"+protocoloFullNode[1]+";"+protocoloFullNode[2]))
+					err = topicBroadcast.Publish(ctx, []byte("aprobado-user;"+protocoloFullNode[1]+";"+protocoloFullNode[2]))
+
 					if err != nil {
 						panic(err)
 					}
 
 					state = true
 				} else if protocoloFullNode[0] == "nueva-transaccion" {
-
 					var jsonTrancs map[string]interface{}
 					var jsonUser map[string]interface{}
 
-					fmt.Println("transaccion : " + fmt.Sprintf(protocoloFullNode[1]))
 					err = json.Unmarshal([]byte(protocoloFullNode[1]), &jsonTrancs)
 					if err != nil {
 						errors.Wrap(err, "main: json.Unmarshal error")
@@ -193,22 +200,34 @@ func main() {
 						Nonce:     int(jsonTrancs["nonce"].(float64)),
 					}
 
+					priv_key_temp, err := stringToByteSlice(jsonUser["private_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+					public_key_temp, err := stringToByteSlice(jsonUser["public_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+
 					userTemp := e.User{
-						PrivateKey:    []byte(jsonUser["private_key"].(string)),
-						PublicKey:     []byte(jsonUser["public_key"].(string)),
+						PrivateKey:    priv_key_temp,
+						PublicKey:     public_key_temp,
 						Nombre:        jsonUser["nombre"].(string),
 						Password:      jsonUser["password"].(string),
 						Nonce:         int(jsonUser["nonce"].(float64)),
 						AccuntBalence: jsonUser["accunt_balence"].(float64),
 					}
 
+					mutex.Lock()
 					FirmaTransaccion(txTemp, userTemp.PrivateKey)
+					mutex.Unlock()
 
 					currentBlock.Transactions = append(currentBlock.Transactions, *txTemp)
 
 					userTemp.Nonce = userTemp.Nonce + 1
 					userTemp.AccuntBalence = userTemp.AccuntBalence - jsonTrancs["amount"].(float64)
 
+					mutex.Lock()
 					err = userdb.Put(protocoloFullNode[3], &userTemp)
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
@@ -221,8 +240,10 @@ func main() {
 
 					recipientPut, err := userdb.Get(jsonTrancs["recipient"].(string))
 					if err != nil {
+						state = true
 						errors.Wrap(err, "No existe o Error")
 					}
+					mutex.Unlock()
 
 					var recipientResult e.User
 					err = json.Unmarshal(recipientPut, &recipientResult)
@@ -232,6 +253,7 @@ func main() {
 
 					recipientResult.AccuntBalence = recipientResult.AccuntBalence + jsonTrancs["amount"].(float64)
 
+					mutex.Lock()
 					err = userdb.Put(jsonTrancs["recipient"].(string), recipientResult)
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
@@ -251,6 +273,7 @@ func main() {
 					if err != nil {
 						errors.Wrap(err, "case 2 json.Unmarshal error")
 					}
+					mutex.Unlock()
 
 					err = topicBroadcast.Publish(ctx, []byte("aprobado-block;"+protocoloFullNode[1]+";"+protocoloFullNode[2]+";"+protocoloFullNode[3]))
 					if err != nil {
@@ -276,16 +299,27 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
+					priv_key_temp, err := stringToByteSlice(jsonTemp["private_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+					public_key_temp, err := stringToByteSlice(jsonTemp["public_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+
 					userTemp := e.User{
-						PrivateKey:    []byte(jsonTemp["private_key"].(string)),
-						PublicKey:     []byte(jsonTemp["public_key"].(string)),
+						PrivateKey:    priv_key_temp,
+						PublicKey:     public_key_temp,
 						Nombre:        jsonTemp["nombre"].(string),
 						Password:      jsonTemp["password"].(string),
 						Nonce:         int(jsonTemp["nonce"].(float64)),
 						AccuntBalence: jsonTemp["accunt_balance"].(float64),
 					}
 
+					mutex.Lock()
 					err = userNodedb.Put(string(protocoloBroadcast[2]), userTemp)
+					mutex.Unlock()
 
 					if err != nil {
 						errors.Wrap(err, "main: userNodedb.Put error")
@@ -307,6 +341,7 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
+					mutex.Lock()
 					err = userNodedb.Put(protocoloBroadcast[3], jsonUser)
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
@@ -316,6 +351,7 @@ func main() {
 					if err != nil {
 						errors.Wrap(err, "No existe o Error")
 					}
+					mutex.Unlock()
 
 					var recipientResult e.User
 					err = json.Unmarshal(recipientPut, &recipientResult)
@@ -325,12 +361,15 @@ func main() {
 
 					recipientResult.AccuntBalence = recipientResult.AccuntBalence + jsonTrancs["amount"].(float64)
 
+					mutex.Lock()
 					err = userNodedb.Put(jsonTrancs["recipient"].(string), recipientResult)
+					mutex.Unlock()
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
 					}
 
 					state = true
+
 				} else if protocoloBroadcast[0] == "agrega-bloque" {
 
 					var jsonBlock e.Block
@@ -340,7 +379,9 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
+					mutex.Lock()
 					err = blockNodedb.Put(protocoloBroadcast[1], jsonBlock)
+					mutex.Unlock()
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
 					}
@@ -349,23 +390,23 @@ func main() {
 		}
 	}()
 
-	if *protocol == p2p.Protocol {
+	if *protocol == Protocol {
 
-		go menu(blockNodedb, userNodedb, topicFullNode, subBroadcast)
+		go menu(blockNodedb, userNodedb, h, topicFullNode, subBroadcast)
 
 		for {
-			isEmpty, err := blockdb.IsEmpty()
-			if err != nil {
-				errors.Wrap(err, "main: blockdb.IsEmpty error")
-			}
-			if isEmpty {
-
-				if *isPublisher {
+			if isPublisher {
+				isEmpty, err := blockdb.IsEmpty()
+				if err != nil {
+					errors.Wrap(err, "main: blockdb.IsEmpty error")
+				}
+				if isEmpty {
 					currentBlock = CreateMainBlock()
 
 					key := fmt.Sprintf("%05d", currentBlock.Index)
-					time.Sleep(60 * time.Second)
+					time.Sleep(10 * time.Second)
 
+					mutex.Lock()
 					err = blockNodedb.Put(key, currentBlock)
 					if err != nil {
 						errors.Wrap(err, "main: blockNodedb.Put error")
@@ -380,64 +421,71 @@ func main() {
 					if err != nil {
 						errors.Wrap(err, "main: json.Marshal error")
 					}
+					mutex.Unlock()
 
 					err = topicBroadcast.Publish(ctx, []byte("agrega-bloque;"+key+";"+string(blockString)))
 
 					if err != nil {
 						panic(err)
 					}
+
+				} else {
+					if isPublisher {
+						mutex.Lock()
+						lastValues := blockdb.GetLastKey()
+						mutex.Unlock()
+
+						if err != nil {
+							errors.Wrap(err, "main: blockNodedb.GetLastKey error")
+						}
+						var result e.Block
+						err = json.Unmarshal(lastValues, &result)
+						if err != nil {
+							errors.Wrap(err, "main: json.unmarshal error")
+						}
+
+						currentBlock = GenerateBlock(result.Index+1, result.Hash)
+						key := fmt.Sprintf("%05d", currentBlock.Index)
+						time.Sleep(10 * time.Second)
+
+						mutex.Lock()
+						err = blockNodedb.Put(key, currentBlock)
+						if err != nil {
+							errors.Wrap(err, "main: blockdb.Put error")
+						}
+
+						err = blockdb.Put(key, currentBlock)
+						if err != nil {
+							errors.Wrap(err, "main: blockdb.Put error")
+						}
+
+						blockString, err := json.Marshal(currentBlock)
+						if err != nil {
+							errors.Wrap(err, "main: json.Marshal error")
+						}
+						mutex.Unlock()
+
+						err = topicBroadcast.Publish(ctx, []byte("agrega-bloque;"+key+";"+string(blockString)))
+
+						if err != nil {
+							panic(err)
+						}
+					}
 				}
-			} else {
-
-				if *isPublisher {
-					lastValues := blockNodedb.GetLastKey()
-					if err != nil {
-						errors.Wrap(err, "main: blockNodedb.GetLastKey error")
-					}
-
-					var result e.Block
-					err = json.Unmarshal(lastValues, &result)
-					if err != nil {
-						errors.Wrap(err, "main: json.unmarshal error")
-					}
-
-					currentBlock = GenerateBlock(result.Index+1, result.Hash)
-					key := fmt.Sprintf("%05d", currentBlock.Index)
-					time.Sleep(60 * time.Second)
-
-					err = blockNodedb.Put(key, currentBlock)
-					if err != nil {
-						errors.Wrap(err, "main: blockdb.Put error")
-					}
-
-					err = blockdb.Put(key, currentBlock)
-					if err != nil {
-						errors.Wrap(err, "main: blockdb.Put error")
-					}
-
-					blockString, err := json.Marshal(currentBlock)
-					if err != nil {
-						errors.Wrap(err, "main: json.Marshal error")
-					}
-
-					err = topicBroadcast.Publish(ctx, []byte("agrega-bloque;"+key+";"+string(blockString)))
-
-					if err != nil {
-						panic(err)
-					}
-				}
-
 			}
+
 		}
+
 	} else {
 		fmt.Println("Protocolo no valido")
 	}
 
 }
 
-func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadcast *pubsub.Subscription) {
+func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topic, subBroadcast *pubsub.Subscription) {
 	var inputPass, inputUser string
 	var resultUser e.User
+	var p_address string
 
 	for {
 		for {
@@ -445,6 +493,10 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 			var option int
 			var bandera bool = false
 			var userRegister, passRegister string
+			fmt.Println("-----------------------------")
+			fmt.Printf("Nodo address: %s\n", h.ID().String())
+			fmt.Printf("Address: %s \n", p_address)
+			fmt.Println("-----------------------------")
 			fmt.Println("\n---------- Menú ----------")
 			fmt.Println("1. Ingresar")
 			fmt.Println("2. Registrar")
@@ -472,6 +524,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 				if resultUser.Password != "" {
 					if resultUser.Password == inputPass {
 						fmt.Println("Credenciales Correctas.")
+						p_address = inputUser
 						time.Sleep(2 * time.Second)
 						ClearScreen()
 						bandera = true
@@ -494,7 +547,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 				fmt.Scanln(&passRegister)
 
 				privKey, publicKey, address := GeneraLlavesYAddress()
-
+				p_address = address
 				dataString := fmt.Sprintf(`{
 					"private_key":    "%v",
 					"public_key":     "%v",
@@ -502,7 +555,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 					"password":      "%s",
 					"nonce":         %d,
 					"accunt_balance": %d
-				};%s`, string(privKey), string(publicKey), userRegister, passRegister, 0, 1000, address)
+				};%s`, fmt.Sprintf("%v", privKey), fmt.Sprintf("%v", publicKey), userRegister, passRegister, 0, 1000, address)
 
 				topicFullNode.Publish(context.Background(), []byte("nuevo-user;"+dataString))
 
@@ -533,6 +586,10 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 		for {
 			var option int
 			var bandera bool = false
+			fmt.Println("-----------------------------")
+			fmt.Printf("Nodo address: %s\n", h.ID().String())
+			fmt.Printf("Address: %s \n", p_address)
+			fmt.Println("-----------------------------")
 			fmt.Println("\n---------- Menú ----------")
 			fmt.Println("1. Ver contactos")
 			fmt.Println("2. Realizar transacción")
@@ -585,13 +642,6 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 					break
 				}
 
-				// tx := &e.Transaction{
-				// 	Sender:    inputUser,
-				// 	Recipient: recipient,
-				// 	Amount:    amount,
-				// 	Nonce:     resultUser.Nonce + 1,
-				// }
-
 				txShare := fmt.Sprintf(`{
 					"sender":    "%s",
 					"recipient": "%s",
@@ -606,7 +656,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 					"password":          "%s",
 					"nonce":             %d,
 					"accunt_balence":    %f
-				}`, string(resultUser.PrivateKey), string(resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+				}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
 
 				err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+inputUser))
 				if err != nil {
@@ -794,6 +844,17 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 				fmt.Println("PreviousHash: " + fmt.Sprint(resultBlock.PreviousHash))
 				fmt.Println("Hash: " + fmt.Sprint(resultBlock.Hash))
 				fmt.Println("Transactions: ")
+				for _, tx := range resultBlock.Transactions {
+					if tx.Sender == inputUser || tx.Recipient == inputUser {
+						fmt.Println("----------------")
+						fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+						fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+						fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+						fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+						fmt.Println("----------------")
+					}
+				}
+				fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 				fmt.Println("------------------------------------------------------------------")
 				fmt.Print("Presiona enter para continuar...")
 				fmt.Scanln()
@@ -825,6 +886,7 @@ func menu(blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic, subBroadca
 							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
 							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
 							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+							fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
 							fmt.Println("----------------")
 						}
 					}
@@ -866,4 +928,22 @@ func ClearScreen() {
 		cmd.Stdout = os.Stdout
 		cmd.Run()
 	}
+}
+
+func stringToByteSlice(str string) ([]byte, error) {
+	trimmedString := strings.Trim(str, "[]")
+
+	byteStrings := strings.Fields(trimmedString)
+
+	byteSlice := make([]byte, len(byteStrings))
+
+	for i, s := range byteStrings {
+		val, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, err
+		}
+		byteSlice[i] = byte(val)
+	}
+
+	return byteSlice, nil
 }
