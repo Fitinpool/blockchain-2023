@@ -399,7 +399,9 @@ func main() {
 		if isPublisher {
 			ExportarLevelDB(blockdb, "blockchain")
 			ExportarLevelDB(userdb, "userdb")
-			go StartServer(userdb, blockdb)
+			ImportarLevelDB(blockNodedb, "blockchain")
+			ImportarLevelDB(userNodedb, "userdb")
+			go StartServer(userdb, blockdb, topicFullNode)
 		} else {
 			ImportarLevelDB(blockNodedb, "blockchain")
 			ImportarLevelDB(userNodedb, "userdb")

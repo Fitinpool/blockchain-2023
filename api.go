@@ -3,21 +3,23 @@ package main
 
 import (
 	e "blockchain/entities"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 )
 
-func StartServer(userdb *Store, blockdb *Store) {
+func StartServer(userdb *Store, blockdb *Store, topicFullNode *pubsub.Topic) {
 	router := mux.NewRouter()
 
 	// Definir rutas para la API
 	router.HandleFunc("/transacciones", func(w http.ResponseWriter, r *http.Request) {
-		CrearNuevaTransaccion(w, r, blockdb, userdb)
+		CrearNuevaTransaccion(w, r, blockdb, userdb, topicFullNode)
 	}).Methods("POST")
 	router.HandleFunc("/bloque/{index}", func(w http.ResponseWriter, r *http.Request) {
 		BuscarBloqueHandler(w, r, blockdb)
@@ -30,7 +32,7 @@ func StartServer(userdb *Store, blockdb *Store) {
 	http.ListenAndServe(":3000", router)
 }
 
-func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Store, userdb *Store) {
+func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Store, userdb *Store, topicFullNode *pubsub.Topic) {
 	var params struct {
 		Remitente    string
 		Destinatario string
@@ -48,13 +50,6 @@ func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Stor
 	fmt.Println("- Destinatario:", params.Destinatario)
 	fmt.Println("- Monto:", params.Monto)
 
-	tx := &e.Transaction{
-		Sender:    params.Remitente,
-		Recipient: params.Destinatario,
-		Amount:    params.Monto,
-		Nonce:     1,
-	}
-
 	var resultUser e.User
 	retrievedData, err := userdb.Get(params.Remitente)
 	if err != nil {
@@ -66,47 +61,68 @@ func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Stor
 		errors.Wrap(err, "user json.Unmarshal error")
 	}
 
-	FirmaTransaccion(tx, resultUser.PrivateKey)
-	currentBlock.Transactions = append(currentBlock.Transactions, *tx)
+	txShare := fmt.Sprintf(`{
+		"sender":    "%s",
+		"recipient": "%s",
+		"amount":    %f,
+		"nonce":     %d
+	}`, params.Remitente, params.Destinatario, params.Monto, resultUser.Nonce+1)
 
-	fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-	fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+	userString := fmt.Sprintf(`{
+		"private_key":        "%v",
+		"public_key":         "%v",
+		"nombre":            "%s",
+		"password":          "%s",
+		"nonce":             %d,
+		"accunt_balence":    %f
+	}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
 
-	resultUser.Nonce = resultUser.Nonce + 1
-	resultUser.AccuntBalence = resultUser.AccuntBalence - params.Monto
-
-	err = userdb.Put(params.Remitente, resultUser)
+	err = topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+resultUser.Nombre))
 	if err != nil {
-		errors.Wrap(err, "case 2 userdb.Put error")
+		panic(err)
 	}
 
-	recipientPut, err := userdb.Get(params.Destinatario)
-	if err != nil {
-		errors.Wrap(err, "No existe o Error")
-	}
+	// FirmaTransaccion(tx, resultUser.PrivateKey)
+	// currentBlock.Transactions = append(currentBlock.Transactions, *tx)
 
-	var recipientResult e.User
-	err = json.Unmarshal(recipientPut, &recipientResult)
-	if err != nil {
-		errors.Wrap(err, "case 2 json.Unmarshal error")
-	}
+	// fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+	// fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
 
-	recipientResult.AccuntBalence = recipientResult.AccuntBalence + params.Monto
+	// resultUser.Nonce = resultUser.Nonce + 1
+	// resultUser.AccuntBalence = resultUser.AccuntBalence - params.Monto
 
-	err = userdb.Put(params.Destinatario, recipientResult)
-	if err != nil {
-		errors.Wrap(err, "case 2 userdb.Put error")
-	}
+	// err = userdb.Put(params.Remitente, resultUser)
+	// if err != nil {
+	// 	errors.Wrap(err, "case 2 userdb.Put error")
+	// }
 
-	newResult, err := userdb.Get(params.Remitente)
-	if err != nil {
-		errors.Wrap(err, "userdb.Get error")
-	}
+	// recipientPut, err := userdb.Get(params.Destinatario)
+	// if err != nil {
+	// 	errors.Wrap(err, "No existe o Error")
+	// }
 
-	err = json.Unmarshal(newResult, &resultUser)
-	if err != nil {
-		errors.Wrap(err, "case 2 json.Unmarshal error")
-	}
+	// var recipientResult e.User
+	// err = json.Unmarshal(recipientPut, &recipientResult)
+	// if err != nil {
+	// 	errors.Wrap(err, "case 2 json.Unmarshal error")
+	// }
+
+	// recipientResult.AccuntBalence = recipientResult.AccuntBalence + params.Monto
+
+	// err = userdb.Put(params.Destinatario, recipientResult)
+	// if err != nil {
+	// 	errors.Wrap(err, "case 2 userdb.Put error")
+	// }
+
+	// newResult, err := userdb.Get(params.Remitente)
+	// if err != nil {
+	// 	errors.Wrap(err, "userdb.Get error")
+	// }
+
+	// err = json.Unmarshal(newResult, &resultUser)
+	// if err != nil {
+	// 	errors.Wrap(err, "case 2 json.Unmarshal error")
+	// }
 
 	// Responder con éxito
 	w.WriteHeader(http.StatusCreated)
