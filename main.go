@@ -59,10 +59,13 @@ func main() {
 	if err != nil {
 		errors.Wrap(err, "main: block NewStore error")
 	}
+	defer blockdb.Close()
+
 	userdb, err := NewStore("userdb")
 	if err != nil {
 		errors.Wrap(err, "main: user NewStore error")
 	}
+	defer userdb.Close()
 
 	blockNodedb, err := NewStore(fmt.Sprintf("node-block-%s", h.ID().String()))
 	if err != nil {
@@ -75,9 +78,6 @@ func main() {
 		errors.Wrap(err, "main: userNodedb NewStore error")
 	}
 	defer userNodedb.Close()
-
-	CopyStore(blockdb, blockNodedb)
-	CopyStore(userdb, userNodedb)
 
 	// Conectar a otro nodo si se proporciona una dirección
 	if *connectTo != "" {
@@ -179,6 +179,8 @@ func main() {
 					}
 
 					state = true
+					ExportarLevelDB(blockdb, "blockchain")
+					ExportarLevelDB(userdb, "userdb")
 				} else if protocoloFullNode[0] == "nueva-transaccion" {
 					var jsonTrancs map[string]interface{}
 					var jsonUser map[string]interface{}
@@ -281,6 +283,8 @@ func main() {
 					}
 
 					state = true
+					ExportarLevelDB(blockdb, "blockchain")
+					ExportarLevelDB(userdb, "userdb")
 				}
 
 			} else {
@@ -326,6 +330,8 @@ func main() {
 					}
 
 					state = true
+					ExportarLevelDB(blockdb, "blockchain")
+					ExportarLevelDB(userdb, "userdb")
 				} else if protocoloBroadcast[0] == "aprobado-block" {
 
 					var jsonTrancs map[string]interface{}
@@ -369,6 +375,8 @@ func main() {
 					}
 
 					state = true
+					ExportarLevelDB(blockdb, "blockchain")
+					ExportarLevelDB(userdb, "userdb")
 
 				} else if protocoloBroadcast[0] == "agrega-bloque" {
 
@@ -391,6 +399,14 @@ func main() {
 	}()
 
 	if *protocol == Protocol {
+
+		if isPublisher {
+			ExportarLevelDB(blockdb, "blockchain")
+			ExportarLevelDB(userdb, "userdb")
+		} else {
+			ImportarLevelDB(blockNodedb, "blockchain")
+			ImportarLevelDB(userNodedb, "userdb")
+		}
 
 		go menu(blockNodedb, userNodedb, h, topicFullNode, subBroadcast)
 
@@ -625,6 +641,7 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 
 			case 2:
 				var recipient string
+				var amountStr string
 				var amount float64
 
 				fmt.Printf("Saldo : %f", resultUser.AccuntBalence)
@@ -633,92 +650,63 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 				fmt.Scanln(&recipient)
 
 				fmt.Print("Introduce la cantidad: ")
-				fmt.Scanln(&amount)
+				fmt.Scanln(&amountStr)
 
-				if amount > resultUser.AccuntBalence {
+				amount, err := strconv.ParseFloat(amountStr, 64)
+
+				if err != nil {
+
+					fmt.Println("Por favor, introduce un número válido.")
+				} else if amount > resultUser.AccuntBalence {
 					fmt.Println("No tienes saldo suficiente")
 					time.Sleep(2 * time.Second)
 					ClearScreen()
 					break
-				}
-
-				txShare := fmt.Sprintf(`{
-					"sender":    "%s",
-					"recipient": "%s",
-					"amount":    %f,
-					"nonce":     %d
-				}`, inputUser, recipient, amount, resultUser.Nonce+1)
-
-				userString := fmt.Sprintf(`{
-					"private_key":        "%v",
-					"public_key":         "%v",
-					"nombre":            "%s",
-					"password":          "%s",
-					"nonce":             %d,
-					"accunt_balence":    %f
-				}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
-
-				err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+inputUser))
-				if err != nil {
-					panic(err)
-				}
-
-				// FirmaTransaccion(tx, resultUser.PrivateKey)
-
-				// currentBlock.Transactions = append(currentBlock.Transactions, *tx)
-
-				fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-				fmt.Println("Nonce:" + fmt.Sprint(resultUser.Nonce))
-
-				// resultUser.Nonce = resultUser.Nonce + 1
-				// resultUser.AccuntBalence = resultUser.AccuntBalence - amount
-
-				// err = userdb.Put(inputUser, resultUser)
-				// if err != nil {
-				// 	errors.Wrap(err, "case 2 userdb.Put error")
-				// }
-
-				// recipientPut, err := userdb.Get(recipient)
-				// if err != nil {
-				// 	errors.Wrap(err, "No existe o Error")
-				// }
-
-				// var recipientResult e.User
-				// err = json.Unmarshal(recipientPut, &recipientResult)
-				// if err != nil {
-				// 	errors.Wrap(err, "case 2 json.Unmarshal error")
-				// }
-
-				// recipientResult.AccuntBalence = recipientResult.AccuntBalence + amount
-
-				// err = userdb.Put(recipient, recipientResult)
-				// if err != nil {
-				// 	errors.Wrap(err, "case 2 userdb.Put error")
-				// }
-
-				// newResult, err := userdb.Get(inputUser)
-				// if err != nil {
-				// 	errors.Wrap(err, "userdb.Get error")
-				// }
-
-				// err = json.Unmarshal(newResult, &resultUser)
-				// if err != nil {
-				// 	errors.Wrap(err, "case 2 json.Unmarshal error")
-				// }
-
-				for {
-					if state {
-						break
-					}
-					fmt.Print("Esperando respuesta...")
+				} else if amount <= 0 {
+					fmt.Println("Cantidad no válida")
 					time.Sleep(2 * time.Second)
 					ClearScreen()
+					break
+				} else {
+					txShare := fmt.Sprintf(`{
+						"sender":    "%s",
+						"recipient": "%s",
+						"amount":    %f,
+						"nonce":     %d
+					}`, inputUser, recipient, amount, resultUser.Nonce+1)
+
+					userString := fmt.Sprintf(`{
+						"private_key":        "%v",
+						"public_key":         "%v",
+						"nombre":            "%s",
+						"password":          "%s",
+						"nonce":             %d,
+						"accunt_balence":    %f
+					}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+
+					err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+inputUser))
+					if err != nil {
+						panic(err)
+					}
+
+					fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+					fmt.Println("Nonce:" + fmt.Sprint(resultUser.Nonce))
+
+					for {
+						if state {
+							break
+						}
+						fmt.Print("Esperando respuesta...")
+						time.Sleep(2 * time.Second)
+						ClearScreen()
+					}
+
+					fmt.Print("Presiona enter para continuar...")
+					fmt.Scanln()
+					ClearScreen()
+					state = false
 				}
 
-				fmt.Print("Presiona enter para continuar...")
-				fmt.Scanln()
-				ClearScreen()
-				state = false
 			case 3:
 				blocks, err := blockdb.GetAllBlocks()
 				if len(blocks) == 0 {

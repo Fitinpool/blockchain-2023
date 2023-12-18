@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"sync"
 
 	e "blockchain/entities"
@@ -20,6 +22,20 @@ type Store struct {
 	mu sync.RWMutex
 }
 
+type DataItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// func DelStore(dbName string) error {
+// 	pathToDB := fmt.Sprintf("data/%s", dbName)
+// 	err := os.RemoveAll(pathToDB)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
+
 func NewStore(dbName string) (*Store, error) {
 	pathToDB := fmt.Sprintf("data/%s", dbName)
 	db, err := leveldb.OpenFile(pathToDB, nil)
@@ -30,12 +46,78 @@ func NewStore(dbName string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func CopyStore(srcDB, destDB *Store) error {
-	iter := srcDB.db.NewIterator(nil, nil)
+func ExportarLevelDB(db *Store, archivoDestino string) error {
+	iter := db.db.NewIterator(nil, nil)
+	defer iter.Release()
+
+	file, err := os.Create(archivoDestino)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
+
+		item := DataItem{Key: string(key), Value: string(value)}
+		if err := encoder.Encode(item); err != nil {
+			return err
+		}
+	}
+
+	return iter.Error()
+}
+
+func ImportarLevelDB(db *Store, archivoOrigen string) error {
+	file, err := os.Open(archivoOrigen)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	for {
+		var item DataItem
+		if err := decoder.Decode(&item); err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if err := db.db.Put([]byte(item.Key), []byte(item.Value), nil); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CopyStore(srcDB, destDB *Store) error {
+	if srcDB == nil || destDB == nil {
+		return errors.New("srcDB and destDB must not be nil")
+	}
+
+	if srcDB.db == nil || destDB.db == nil {
+		return errors.New("srcDB.db and destDB.db must not be nil")
+	}
+
+	iter := srcDB.db.NewIterator(nil, nil)
+	if iter == nil {
+		return errors.New("failed to create iterator")
+	}
+
+	for iter.Next() {
+		key := iter.Key()
+		value := iter.Value()
+
+		// Logging para depuración
+		fmt.Printf("Copying key: %s, value: %s\n", key, value)
+
 		if err := destDB.db.Put(key, value, nil); err != nil {
+			iter.Release()
 			return errors.Wrap(err, "CopyStore destDB.Put error")
 		}
 	}
