@@ -330,8 +330,6 @@ func main() {
 					}
 
 					state = true
-					ExportarLevelDB(blockdb, "blockchain")
-					ExportarLevelDB(userdb, "userdb")
 				} else if protocoloBroadcast[0] == "aprobado-block" {
 
 					var jsonTrancs map[string]interface{}
@@ -375,8 +373,6 @@ func main() {
 					}
 
 					state = true
-					ExportarLevelDB(blockdb, "blockchain")
-					ExportarLevelDB(userdb, "userdb")
 
 				} else if protocoloBroadcast[0] == "agrega-bloque" {
 
@@ -403,6 +399,7 @@ func main() {
 		if isPublisher {
 			ExportarLevelDB(blockdb, "blockchain")
 			ExportarLevelDB(userdb, "userdb")
+			go StartServer(userdb, blockdb)
 		} else {
 			ImportarLevelDB(blockNodedb, "blockchain")
 			ImportarLevelDB(userNodedb, "userdb")
@@ -600,6 +597,17 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 		}
 
 		for {
+
+			retrievedData, err := userdb.Get(inputUser)
+			if err != nil {
+				errors.Wrap(err, "userdb.Get error")
+			}
+
+			err = json.Unmarshal(retrievedData, &resultUser)
+			if err != nil {
+				errors.Wrap(err, "user json.Unmarshal error")
+			}
+
 			var option int
 			var bandera bool = false
 			fmt.Println("-----------------------------")

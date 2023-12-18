@@ -12,23 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var userdb Store
-var blockdb Store
-
-func StartServer() {
-	var err error
-	userdb, err := NewStore("userdb")
-	if err != nil {
-		errors.Wrap(err, "NewStore error userdb")
-	}
-	defer userdb.Close()
-
-	blockdb, err := NewStore("blockchain")
-	if err != nil {
-		errors.Wrap(err, "NewStore error blockchain")
-	}
-	defer blockdb.Close()
-
+func StartServer(userdb *Store, blockdb *Store) {
 	router := mux.NewRouter()
 
 	// Definir rutas para la API
