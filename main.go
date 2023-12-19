@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -345,14 +346,37 @@ func main() {
 						errors.Wrap(err, "main: json.Unmarshal error")
 					}
 
+					priv_key_temp, err := stringToByteSlice(jsonUser["private_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+					public_key_temp, err := stringToByteSlice(jsonUser["public_key"].(string))
+					if err != nil {
+						errors.Wrap(err, "main: stringToByteSlice error")
+					}
+
+					userTemp := e.User{
+						PrivateKey:    priv_key_temp,
+						PublicKey:     public_key_temp,
+						Nombre:        jsonUser["nombre"].(string),
+						Password:      jsonUser["password"].(string),
+						Nonce:         int(jsonUser["nonce"].(float64)),
+						AccuntBalence: jsonUser["accunt_balence"].(float64),
+					}
+
+					userTemp.Nonce = userTemp.Nonce + 1
+					userTemp.AccuntBalence = userTemp.AccuntBalence - jsonTrancs["amount"].(float64)
+
 					mutex.Lock()
-					err = userNodedb.Put(protocoloBroadcast[3], jsonUser)
+
+					err = userNodedb.Put(protocoloBroadcast[3], &userTemp)
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
 					}
 
 					recipientPut, err := userNodedb.Get(jsonTrancs["recipient"].(string))
 					if err != nil {
+						state = true
 						errors.Wrap(err, "No existe o Error")
 					}
 					mutex.Unlock()
@@ -366,11 +390,12 @@ func main() {
 					recipientResult.AccuntBalence = recipientResult.AccuntBalence + jsonTrancs["amount"].(float64)
 
 					mutex.Lock()
+
 					err = userNodedb.Put(jsonTrancs["recipient"].(string), recipientResult)
-					mutex.Unlock()
 					if err != nil {
 						errors.Wrap(err, "case 2 userdb.Put error")
 					}
+					mutex.Unlock()
 
 					state = true
 
@@ -600,7 +625,7 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 
 		for {
 
-			retrievedData, err := userdb.Get(inputUser)
+			retrievedData, err := userdb.Get(p_address)
 			if err != nil {
 				errors.Wrap(err, "userdb.Get error")
 			}
@@ -613,9 +638,10 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 			var option int
 			var bandera bool = false
 			fmt.Println("-----------------------------")
-			fmt.Printf("Nodo address: %s\n", h.ID().String())
+			fmt.Printf("Nodo ID: %s\n", h.ID().String())
 			fmt.Printf("Address: %s \n", p_address)
 			fmt.Println("-----------------------------")
+			fmt.Printf("Saldo : %f", resultUser.AccuntBalence)
 			fmt.Println("\n---------- Menú ----------")
 			fmt.Println("1. Ver contactos")
 			fmt.Println("2. Realizar transacción")
@@ -685,14 +711,26 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 						"nonce":     %d
 					}`, inputUser, recipient, amount, resultUser.Nonce+1)
 
-					userString := fmt.Sprintf(`{
-						"private_key":        "%v",
-						"public_key":         "%v",
-						"nombre":            "%s",
-						"password":          "%s",
-						"nonce":             %d,
-						"accunt_balence":    %f
-					}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+					userString := ""
+					if reflect.TypeOf(resultUser.PrivateKey).Kind() == reflect.String {
+						userString = fmt.Sprintf(`{
+							"private_key":        "%v",
+							"public_key":         "%v",
+							"nombre":            "%s",
+							"password":          "%s",
+							"nonce":             %d,
+							"accunt_balence":    %f
+						}`, resultUser.PrivateKey, resultUser.PublicKey, resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+					} else {
+						userString = fmt.Sprintf(`{
+							"private_key":        "%v",
+							"public_key":         "%v",
+							"nombre":            "%s",
+							"password":          "%s",
+							"nonce":             %d,
+							"accunt_balence":    %f
+						}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+					}
 
 					err := topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+inputUser))
 					if err != nil {
