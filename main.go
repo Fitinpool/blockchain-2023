@@ -471,9 +471,7 @@ func main() {
 
 				} else {
 					if isPublisher {
-						mutex.Lock()
 						lastValues := blockdb.GetLastKey()
-						mutex.Unlock()
 
 						if err != nil {
 							errors.Wrap(err, "main: blockNodedb.GetLastKey error")
@@ -534,7 +532,7 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 			var bandera bool = false
 			var userRegister, passRegister string
 			fmt.Println("-----------------------------")
-			fmt.Printf("Nodo address: %s\n", h.ID().String())
+			fmt.Printf("Nodo ID: %s\n", h.ID().String())
 			fmt.Printf("Address: %s \n", p_address)
 			fmt.Println("-----------------------------")
 			fmt.Println("\n---------- Menú ----------")
@@ -624,6 +622,11 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 		}
 
 		for {
+			lastKey := blockdb.GetLastKey()
+			err := json.Unmarshal(lastKey, &currentBlock)
+			if err != nil {
+				errors.Wrap(err, "main: json.unmarshal error")
+			}
 
 			retrievedData, err := userdb.Get(p_address)
 			if err != nil {
@@ -680,8 +683,6 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 				var amountStr string
 				var amount float64
 
-				fmt.Printf("Saldo : %f", resultUser.AccuntBalence)
-				fmt.Println("")
 				fmt.Print("Introduce el destinatario: ")
 				fmt.Scanln(&recipient)
 
@@ -737,7 +738,7 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 						panic(err)
 					}
 
-					fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
+					fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index+1))
 					fmt.Println("Nonce:" + fmt.Sprint(resultUser.Nonce))
 
 					for {
