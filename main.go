@@ -771,14 +771,14 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 				fmt.Println("------------------------------------------------------------------")
 				for _, block := range blocks {
 					for _, tx := range block.Transactions {
-						if tx.Sender == inputUser || tx.Recipient == inputUser {
-							fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
-							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
-							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
-							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
-							fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-							fmt.Println("Bloque:" + fmt.Sprint(block.Index))
-						}
+						//if tx.Sender == inputUser || tx.Recipient == inputUser {
+						fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
+						fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+						fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+						fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+						fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+						fmt.Println("Bloque:" + fmt.Sprint(block.Index))
+						//}
 					}
 				}
 				fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
@@ -882,14 +882,14 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 				fmt.Println("Hash: " + fmt.Sprint(resultBlock.Hash))
 				fmt.Println("Transactions: ")
 				for _, tx := range resultBlock.Transactions {
-					if tx.Sender == inputUser || tx.Recipient == inputUser {
-						fmt.Println("----------------")
-						fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
-						fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
-						fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
-						fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-						fmt.Println("----------------")
-					}
+					//if tx.Sender == inputUser || tx.Recipient == inputUser {
+					fmt.Println("----------------")
+					fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+					fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+					fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+					fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+					fmt.Println("----------------")
+					//}
 				}
 				fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 				fmt.Println("------------------------------------------------------------------")
@@ -918,14 +918,14 @@ func menu(blockdb *Store, userdb *Store, h host.Host, topicFullNode *pubsub.Topi
 					fmt.Println("Hash: " + fmt.Sprint(block.Hash))
 					fmt.Println("Transactions: ")
 					for _, tx := range block.Transactions {
-						if tx.Sender == inputUser || tx.Recipient == inputUser {
-							fmt.Println("----------------")
-							fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
-							fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
-							fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
-							fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-							fmt.Println("----------------")
-						}
+						//if tx.Sender == inputUser || tx.Recipient == inputUser {
+						fmt.Println("----------------")
+						fmt.Println("Sender: " + fmt.Sprint(tx.Sender))
+						fmt.Println("Recipient: " + fmt.Sprint(tx.Recipient))
+						fmt.Println("Amount:" + fmt.Sprint(tx.Amount))
+						fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
+						fmt.Println("----------------")
+						//}
 					}
 					fmt.Println("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 				}
