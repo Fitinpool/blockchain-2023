@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -28,7 +29,7 @@ func StartServer(userdb *Store, blockdb *Store, topicFullNode *pubsub.Topic) {
 		BuscarUltimaTransaccionHandler(w, r, blockdb)
 	}).Methods("GET")
 	// Iniciar el servidor en el puerto 3000
-	fmt.Println("Servidor iniciado en el puerto 3000")
+	// fmt.Println("Servidor iniciado en el puerto 3000")
 	http.ListenAndServe(":3000", router)
 }
 
@@ -43,12 +44,6 @@ func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Stor
 		http.Error(w, "Error decodificando parámetros", http.StatusBadRequest)
 		return
 	}
-
-	// Imprimir los parámetros
-	fmt.Println("Nueva transacción:")
-	fmt.Println("- Remitente:", params.Remitente)
-	fmt.Println("- Destinatario:", params.Destinatario)
-	fmt.Println("- Monto:", params.Monto)
 
 	var resultUser e.User
 	retrievedData, err := userdb.Get(params.Remitente)
@@ -68,63 +63,32 @@ func CrearNuevaTransaccion(w http.ResponseWriter, r *http.Request, blockdb *Stor
 		"nonce":     %d
 	}`, params.Remitente, params.Destinatario, params.Monto, resultUser.Nonce+1)
 
-	userString := fmt.Sprintf(`{
-		"private_key":        "%v",
-		"public_key":         "%v",
-		"nombre":            "%s",
-		"password":          "%s",
-		"nonce":             %d,
-		"accunt_balence":    %f
-	}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+	userString := ""
+	if reflect.TypeOf(resultUser.PrivateKey).Kind() == reflect.String {
+		userString = fmt.Sprintf(`{
+			"private_key":        "%v",
+			"public_key":         "%v",
+			"nombre":            "%s",
+			"password":          "%s",
+			"nonce":             %d,
+			"accunt_balence":    %f
+		}`, resultUser.PrivateKey, resultUser.PublicKey, resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+	} else {
+		userString = fmt.Sprintf(`{
+			"private_key":        "%v",
+			"public_key":         "%v",
+			"nombre":            "%s",
+			"password":          "%s",
+			"nonce":             %d,
+			"accunt_balence":    %f
+		}`, fmt.Sprintf("%v", resultUser.PrivateKey), fmt.Sprintf("%v", resultUser.PublicKey), resultUser.Nombre, resultUser.Password, resultUser.Nonce, resultUser.AccuntBalence)
+	}
 
 	err = topicFullNode.Publish(context.Background(), []byte("nueva-transaccion;"+txShare+";"+userString+";"+resultUser.Nombre))
 	if err != nil {
 		panic(err)
 	}
 
-	// FirmaTransaccion(tx, resultUser.PrivateKey)
-	// currentBlock.Transactions = append(currentBlock.Transactions, *tx)
-
-	// fmt.Println("Transaccion agregada en el bloque: " + fmt.Sprintf("%d", currentBlock.Index))
-	// fmt.Println("Nonce:" + fmt.Sprint(tx.Nonce))
-
-	// resultUser.Nonce = resultUser.Nonce + 1
-	// resultUser.AccuntBalence = resultUser.AccuntBalence - params.Monto
-
-	// err = userdb.Put(params.Remitente, resultUser)
-	// if err != nil {
-	// 	errors.Wrap(err, "case 2 userdb.Put error")
-	// }
-
-	// recipientPut, err := userdb.Get(params.Destinatario)
-	// if err != nil {
-	// 	errors.Wrap(err, "No existe o Error")
-	// }
-
-	// var recipientResult e.User
-	// err = json.Unmarshal(recipientPut, &recipientResult)
-	// if err != nil {
-	// 	errors.Wrap(err, "case 2 json.Unmarshal error")
-	// }
-
-	// recipientResult.AccuntBalence = recipientResult.AccuntBalence + params.Monto
-
-	// err = userdb.Put(params.Destinatario, recipientResult)
-	// if err != nil {
-	// 	errors.Wrap(err, "case 2 userdb.Put error")
-	// }
-
-	// newResult, err := userdb.Get(params.Remitente)
-	// if err != nil {
-	// 	errors.Wrap(err, "userdb.Get error")
-	// }
-
-	// err = json.Unmarshal(newResult, &resultUser)
-	// if err != nil {
-	// 	errors.Wrap(err, "case 2 json.Unmarshal error")
-	// }
-
-	// Responder con éxito
 	w.WriteHeader(http.StatusCreated)
 
 }
