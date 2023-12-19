@@ -444,7 +444,7 @@ func main() {
 					currentBlock = CreateMainBlock()
 
 					key := fmt.Sprintf("%05d", currentBlock.Index)
-					time.Sleep(60 * time.Second)
+					time.Sleep(10 * time.Second)
 
 					mutex.Lock()
 					err = blockNodedb.Put(key, currentBlock)
@@ -484,7 +484,7 @@ func main() {
 
 						currentBlock = GenerateBlock(result.Index+1, result.Hash)
 						key := fmt.Sprintf("%05d", currentBlock.Index)
-						time.Sleep(60 * time.Second)
+						time.Sleep(10 * time.Second)
 
 						mutex.Lock()
 						err = blockNodedb.Put(key, currentBlock)
