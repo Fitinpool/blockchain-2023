@@ -29,7 +29,7 @@ Para el inicio de sesión, este utiliza la Address del usuario y su contraseña.
 1. Clona el repositorio.
 2. Asegúrate de tener Go instalado en tu máquina.
 3. Ejecuta `go run . -publish` para iniciar el Full Node.
-4. Ejecuta `go run . -port "Puerto" -connect "Node Address"` para iniciar un Light Node conectado al Full Node, con `Puerto` distinto a 3000 y 4000 (Y también a otros Light Node), y con `Node Address` al Node Address (Representado en el menú) del Full Node.
+4. Ejecuta `go run . -port "Puerto" -connect "Node ID"` para iniciar un Light Node conectado al Full Node, con `Puerto` distinto a 3000 y 4000 (Y también a otros Light Node), y con `Node ID` al Node Address (Representado en el menú) del Full Node.
 
 ## Consideraciones
 
