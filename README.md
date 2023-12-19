@@ -33,7 +33,7 @@ Para el inicio de sesión, este utiliza la Address del usuario y su contraseña.
 
 ## Consideraciones
 
-* Cada bloque en la blockchain se genera cada 1 minuto para modo de ver su uso de manera más rápida, este valor es modificable en la línea 447 y 487 del archivo (`main.go`), si no hay transacciones dentro de ese tiempo la blockchain introducirá el bloque vacío.
+* Cada bloque en la blockchain se genera cada 10 segundos para modo de ver su uso de manera más rápida, este valor es modificable en la línea 447 y 487 del archivo (`main.go`), si no hay transacciones dentro de ese tiempo la blockchain introducirá el bloque vacío.
 
 * La API implementada va a conectada al nodo FULL
 
