@@ -1,0 +1,65 @@
+{
+	"info": {
+		"_postman_id": "5119961e-bde9-4a9e-9356-7ea4652c59ca",
+		"name": "blockchain",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25478836"
+	},
+	"item": [
+		{
+			"name": "buscar_ultima_transaccion",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/buscar_ultima_transaccion",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"buscar_ultima_transaccion"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "buscar bloque",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"Remitente\" : \"0x2ECE5812Ec971C14EFc5F868f5c25799e5a047fd\",\n    \"Destinatario\" : \"0x08EDFf09Af7C456D9f03E62002e09A66052bb2E9\",\n    \"Monto\" : 100\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/transacciones",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"transacciones"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
