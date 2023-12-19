@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "5119961e-bde9-4a9e-9356-7ea4652c59ca",
+		"_postman_id": "b9656333-cbc5-4b0f-978a-5a0d79b8183d",
 		"name": "blockchain",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "25478836"
+		"_exporter_id": "14966776"
 	},
 	"item": [
 		{
@@ -29,12 +29,24 @@
 			"name": "buscar bloque",
 			"request": {
 				"method": "GET",
-				"header": []
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/bloque/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"bloque",
+						"1"
+					]
+				}
 			},
 			"response": []
 		},
 		{
-			"name": "New Request",
+			"name": "realizar transacción",
 			"request": {
 				"method": "POST",
 				"header": [],
